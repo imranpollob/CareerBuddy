@@ -1,0 +1,9 @@
+[
+  {"profile":{"id":"candidate-demo","role":"candidate","name":"Alex Morgan","current_role":"Software Engineer","target_role":"AI Engineer","claimed_skills":["python","sql"],"marketplace_opt_in":false,"candidate_track":"career_switcher"}},
+  {"profile":{"id":"student-demo","role":"candidate","name":"Priya Shah","current_role":"Computer Science Student","target_role":"AI Engineer","claimed_skills":["python","sql"],"marketplace_opt_in":false,"candidate_track":"student"}},
+  {"profile":{"id":"employer-demo","role":"employer","name":"Jordan Lee","current_role":"Hiring Manager","target_role":"Build an AI team","claimed_skills":[],"marketplace_opt_in":false,"candidate_track":"employer"}},
+  {"profile":{"id":"seed-candidate","role":"candidate","name":"Sam Rivera","current_role":"Backend Engineer","target_role":"AI Engineer","claimed_skills":["python","rag","llm"],"marketplace_opt_in":true,"candidate_track":"experienced"},"seed_scores":{"python":100,"rag":100,"llm":75}},
+  {"profile":{"id":"seed-student","role":"candidate","name":"Maya Chen","current_role":"Final-year Computer Science Student","target_role":"Junior AI Engineer","claimed_skills":["python","sql","pytorch"],"marketplace_opt_in":true,"candidate_track":"student"},"seed_scores":{"python":75,"sql":100,"pytorch":75}},
+  {"profile":{"id":"seed-switcher","role":"candidate","name":"Casey Brooks","current_role":"Software Engineer","target_role":"Applied AI Engineer","claimed_skills":["python","sql","aws"],"marketplace_opt_in":true,"candidate_track":"career_switcher"},"seed_scores":{"python":100,"sql":75,"aws":75}},
+  {"profile":{"id":"seed-private","role":"candidate","name":"Taylor Reed","current_role":"AI Engineer","target_role":"AI Engineer","claimed_skills":["python","rag","llm","evaluation"],"marketplace_opt_in":false,"candidate_track":"experienced"},"seed_scores":{"python":100,"rag":100,"llm":100,"evaluation":100}}
+]

@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+.venv
+.local
+frontend
+tests
+__pycache__
+.pytest_cache
