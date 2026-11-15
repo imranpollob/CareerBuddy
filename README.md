@@ -1,6 +1,6 @@
 # CareerBuddy
 
-CareerBuddy is the updated product experience built on the SkillPilot hackathon backend. Internal `SKILLPILOT_*` configuration names, the `SkillPilot` DynamoDB table, and the existing actor accounts are retained.
+CareerBuddy is the updated product experience built on the SkillPilot hackathon backend. Internal `SKILLPILOT_*` configuration names and the `SkillPilot` DynamoDB table are retained.
 
 A local-first career intelligence MVP for the BuilderWars AWS hackathon. One Strands orchestrator delegates to four real specialist agents, backed by Amazon Bedrock and one DynamoDB table. React dashboards connect assessment evidence, learning, and explainable job matching.
 
@@ -57,13 +57,13 @@ uv run python -m scripts.live_agents_smoke
 
 The first script verifies CLI/SDK identity, lists Nova models, and makes a tiny Converse inference call. It creates no AWS infrastructure. Reports under `.local/` contain no credential values or account IDs. The second script makes a small number of live inference calls to check actual nested delegation. These calls use Bedrock credits. Offline unit and browser tests use an explicit mock model instead.
 
-## Accounts and presentation actors
+## Accounts
 
 The app opens on email/password sign-in. Signup asks only for name, email, password, and account purpose. New candidates then have a short adaptive LLM interview about their experience, projects, and career goal. They review the discovered skills before SkillPilot generates a personalized four-question assessment. Discovery starts off. Private records stay attached to the signed-in account.
 
-Three actor accounts are precreated: **Alex Morgan** (`alex@example.com`), **Priya Shah** (`priya@example.com`), and **Jordan Lee** (`jordan@example.com`). Their random initial passwords are stored privately in ignored `.local/actor-accounts.json` after the first backend startup. Open that file locally; do not commit or publish it. These accounts use the same login form as everyone else. The former demo identity selector and passwordless demo endpoints have been removed.
+No accounts or fictional profiles are precreated by default. Create an account through signup. `SKILLPILOT_SEED_ACCOUNTS=false` also excludes sample job postings and blocks old fixture logins/sessions. Sample identities and evidence are reserved for isolated tests. The local cleanup utility is documented in [authentication](docs/AUTHENTICATION.md).
 
-Candidates land on **Home**, with one recommended next action, roadmap progress, a Skill Passport snapshot and three relevant sourced jobs. The sidebar opens **Home**, **AI Chat**, **Learning**, **Assessments**, and **Jobs**; **My Profile** sits by the account controls. AI Chat focuses on conversation, with private history and compact starter prompts. The interface uses a dark Linear-inspired theme (with a light alternative), rendered Markdown and animated generation feedback. Learning contains one saved visual career roadmap, generated competencies and lessons; Assessments contains the Skill Passport and attempt history. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
+Candidates land on **Home**, with one recommended next action, roadmap progress, a Skill Passport snapshot and three relevant sourced jobs. The sidebar opens **Home**, **AI Chat**, **Learning**, **Assessments**, and **Jobs**; **My Profile** sits by the account controls. AI Chat focuses on conversation, with private history and compact starter prompts. The interface uses a dark Linear-inspired theme (with a light alternative), rendered Markdown and animated generation feedback. Learning contains one saved visual career roadmap, generated competencies and lessons; Assessments contains the Skill Passport and attempt history. Sign out before switching accounts. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
 
 ## Tests
 
@@ -110,7 +110,7 @@ Offline mode is explicitly selected through configuration and reported by the AP
 
 ## Data and scope
 
-The bundled sample contains **68 real postings across nine employers**, including eight internship/entry titles, plus six synthetic Northstar Labs roles. All 68 real postings have Bedrock-generated tags: **574 source-grounded tags across 106 distinct skills**. Original URLs, retrieval dates, required/preferred distinctions, supporting excerpts, and model provenance are saved directly in `backend/data/jobs.json`; counts are in `backend/data/jobs_manifest.json`. Seven fictional profiles and three regular actor accounts support presentation; seeded evidence is labeled synthetic. Employer-created postings are tagged from their descriptions as they are saved.
+The active bundled dataset contains **68 real postings across nine employers**, including eight internship/entry titles. All 68 real postings have Bedrock-generated tags: **574 source-grounded tags across 106 distinct skills**. Original URLs, retrieval dates, required/preferred distinctions, supporting excerpts, and model provenance are saved directly in `backend/data/jobs.json`; counts are in `backend/data/jobs_manifest.json`. Six synthetic jobs, seven fictional profiles and their comparison evidence remain isolated test fixtures, disabled in the application by default. Employer-created postings are tagged from their descriptions as they are saved.
 
 Refresh the public sample from free employer APIs, then tag new or changed descriptions with Bedrock:
 

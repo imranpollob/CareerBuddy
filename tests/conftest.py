@@ -20,7 +20,7 @@ class AccountClient(TestClient):
 
 @pytest.fixture
 def client(repo, tmp_path):
-    settings=Settings(ai_mode="mock", repository="memory", actor_credentials_path=str(tmp_path/"actors.json"))
+    settings=Settings(ai_mode="mock", repository="memory", seed_accounts=True, actor_credentials_path=str(tmp_path/"actors.json"))
     with AccountClient(create_app(repo, settings)) as client:
         yield client
 

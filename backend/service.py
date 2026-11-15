@@ -18,6 +18,8 @@ def now():
 class Service:
     def __init__(self, repo: Repository, settings=None):
         self.repo = repo
+        self.include_samples = bool(settings and settings.seed_accounts)
+        self.sample_user_ids={f["profile"]["id"] for f in json.loads((Path(__file__).parent/"data"/"demo_profiles.json").read_text())}
         self.intelligence = None
         if settings is not None:
             from backend.intelligence import Intelligence
@@ -51,9 +53,11 @@ class Service:
         return self.repo.partition(f"USER#{uid}", "SKILL#")
 
     def jobs(self):
-        active_ids = {j["id"] for j in json.loads((Path(__file__).parent / "data" / "jobs.json").read_text())}
+        active_ids = {j["id"] for j in json.loads((Path(__file__).parent / "data" / "jobs.json").read_text())
+                      if self.include_samples or not j["synthetic"]}
         # Removed public snapshots stay stored for history but leave the active sample.
-        return [j for j in self.repo.scan("DETAILS") if j["id"] in active_ids or j.get("employer_id")]
+        return [j for j in self.repo.scan("DETAILS") if (j["id"] in active_ids or j.get("employer_id"))
+                and (self.include_samples or not j.get("synthetic",False))]
 
     def market(self, uid=None):
         jobs = self.jobs()
@@ -237,6 +241,8 @@ class Service:
             raise PermissionError("Only your own job postings can be used for candidate discovery")
         candidates = []
         for profile in self.repo.scan("PROFILE"):
+            if not self.include_samples and profile["id"] in self.sample_user_ids:
+                continue
             if profile["role"] != "candidate" or not profile["marketplace_opt_in"]:
                 continue
             result = match(job, self.skills(profile["id"]))
@@ -254,10 +260,12 @@ class Service:
                 "assessments": sorted(self.repo.partition(f"USER#{uid}", "ASSESSMENT#"), key=lambda a: a["created_at"], reverse=True),
                 "skill_catalog": self.catalog(uid), "market": self.market(uid), "journey": self.journey(uid)}
 
-    def seed(self):
+    def seed(self, *, include_samples=None):
         # Add missing fixtures without replacing edits, consent, or actual attempts.
         path = Path(__file__).parent / "data"
-        for fixture in json.loads((path / "demo_profiles.json").read_text()):
+        if include_samples is not None:
+            self.include_samples=include_samples
+        for fixture in (json.loads((path / "demo_profiles.json").read_text()) if self.include_samples else []):
             profile = Profile.model_validate(fixture["profile"])
             pk = f"USER#{profile.id}"
             existing = self.repo.get(pk, "PROFILE")
@@ -275,6 +283,8 @@ class Service:
                 self.submit(profile.id, attempt["id"], answers, seeded=True)
         # Add new snapshot jobs, leaving employer-created and previously saved records intact.
         for raw in json.loads((path / "jobs.json").read_text()):
+            if raw["synthetic"] and not self.include_samples:
+                continue
             job = Job.model_validate(raw)
             existing = self.repo.get(f"JOB#{job.id}", "DETAILS")
             if not existing:

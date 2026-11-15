@@ -20,7 +20,7 @@ def repository(request):
 
 
 def test_repository_roundtrip_and_conditional_submission(repository):
-    service=Service(repository);service.seed()
+    service=Service(repository);service.seed(include_samples=True)
     assessment=service.create_assessment("candidate-demo","python")
     result=service.submit("candidate-demo",assessment["id"],{"q1":0,"q2":2,"q3":1,"q4":3})
     reloaded=Service(repository)
@@ -33,7 +33,7 @@ def test_repository_roundtrip_and_conditional_submission(repository):
 
 
 def test_memory_concurrent_submission_is_once_only():
-    service=Service(MemoryRepository());service.seed()
+    service=Service(MemoryRepository());service.seed(include_samples=True)
     a=service.create_assessment("candidate-demo","python")
     def submit():
         try:
@@ -77,7 +77,7 @@ def test_competency_path_and_conversation_survive_repository_reload(repository):
     from backend.config import Settings
     from backend import conversation
     from backend.models import ChatResponse
-    service=Service(repository,Settings(ai_mode="mock"));service.seed()
+    service=Service(repository,Settings(ai_mode="mock"));service.seed(include_samples=True)
     uid="candidate-demo"
     skill=service.learning.plan(uid)["skills"][0]["skill"]
     path=service.learning.expand(uid,skill)

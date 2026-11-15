@@ -12,7 +12,7 @@ class LoginRequest(Contract):
 
 
 class SignupRequest(LoginRequest):
-    password: SecretStr = Field(min_length=12, max_length=128)
+    password: SecretStr = Field(min_length=8, max_length=128)
     name: str = Field(min_length=1, max_length=80)
     role: Literal["candidate", "employer"] = "candidate"
     current_role: str = Field(default="Getting started", min_length=1, max_length=120)

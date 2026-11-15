@@ -39,10 +39,10 @@ def test_signup_login_logout_and_persisted_session(client,repo):
 
 
 def test_signup_validation_duplicates_and_no_demo_bypass(client):
-    assert client.post("/api/auth/signup",json={**registration(),"password":"short"}).status_code==422
+    assert client.post("/api/auth/signup",json={**registration(),"password":"1234567"}).status_code==422
     assert client.post("/api/auth/signup",json={**registration(),"email":"invalid"}).status_code==422
     assert client.post("/api/auth/signup",json={**registration(),"uid":"candidate-demo"}).status_code==422
-    assert client.post("/api/auth/signup",json=registration()).status_code==200
+    assert client.post("/api/auth/signup",json={**registration(),"password":"12345678"}).status_code==200
     assert client.post("/api/auth/signup",json=registration("NEW-USER@example.com")).status_code==409
     for actor in ["candidate","student","employer"]:
         assert client.post(f"/api/demo/{actor}").status_code==404

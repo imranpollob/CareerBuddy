@@ -15,7 +15,7 @@ def main():
     load_dotenv()
     logging.disable(logging.CRITICAL)
     service=Service(MemoryRepository())
-    service.seed()
+    service.seed(include_samples=True)
     settings=Settings(ai_mode="bedrock")
     cases=[("What skills are in demand in the saved job postings?", "job_market"),
            ("Prepare a Python assessment.", "assessment"),

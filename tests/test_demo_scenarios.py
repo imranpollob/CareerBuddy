@@ -51,21 +51,21 @@ def test_student_learning_to_employer_with_consent(candidate):
 
 
 def test_seed_upgrade_preserves_edits_consent_and_evidence(repo):
-    service=Service(repo);service.seed()
+    service=Service(repo);service.seed(include_samples=True)
     profile=service.profile("student-demo")
     profile.update(name="Edited student",marketplace_opt_in=True)
     repo.write([item("USER#student-demo","PROFILE",profile)])
     a=service.create_assessment("student-demo","sql")
     service.submit("student-demo",a["id"],{"q1":0,"q2":0,"q3":1,"q4":0})
     evidence=deepcopy(service.skills("student-demo"))
-    service.seed()
+    service.seed(include_samples=True)
     assert service.profile("student-demo")["name"]=="Edited student"
     assert service.profile("student-demo")["marketplace_opt_in"] is True
     assert service.skills("student-demo")==evidence
 
 
 def test_data_covers_students_and_engineers(repo):
-    service=Service(repo);service.seed()
+    service=Service(repo);service.seed(include_samples=True)
     jobs=service.jobs()
     public=[j for j in jobs if not j["synthetic"]]
     assert len(public)>=50

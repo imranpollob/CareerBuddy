@@ -74,7 +74,7 @@ class Auth:
         email = str(request.email).strip().lower()
         account = self.repo.get(*account_key(email))
         valid = self.passwords.verify(request.password.get_secret_value(), account["password_hash"] if account else self.dummy_hash)
-        if not account or not valid:
+        if not account or not valid or (not self.settings.seed_accounts and account["uid"] in self.service.sample_user_ids):
             raise InvalidCredentials("Email or password is incorrect.")
         with self.lock:
             self.attempts.pop(f"login:email:{digest(email)}", None)
@@ -92,6 +92,8 @@ class Auth:
         session = self.repo.get(f"SESSION#{digest(token)}", "AUTH_SESSION")
         if not session or session["expires_at"] <= time.time():
             raise InvalidCredentials("Your session has expired. Please sign in again.")
+        if not self.settings.seed_accounts and session["uid"] in self.service.sample_user_ids:
+            raise InvalidCredentials("Please sign in with your own account.")
         return session
 
     def logout(self, token):

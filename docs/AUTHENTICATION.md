@@ -2,15 +2,16 @@
 
 SkillPilot supports email/password signup and login for new candidates and employers. The application has no identity selector and no passwordless demo-login endpoints. Each signed-in user gets their own profile, assessments, learning progress, matches, and employer postings.
 
-On first startup, three presenter accounts are attached to the existing fictional actor profiles:
+No accounts or fictional profiles are precreated by default. Keep `SKILLPILOT_SEED_ACCOUNTS=false` for normal use. Signup creates the candidate or employer account; only actual submissions create assessment evidence. Old fixture logins and sessions are rejected when sample seeding is disabled. Isolated tests explicitly enable their own sample data in separate repositories.
 
-| Actor | Email | Role |
-| --- | --- | --- |
-| Alex Morgan | `alex@example.com` | Candidate, software engineer |
-| Priya Shah | `priya@example.com` | Candidate, student |
-| Jordan Lee | `jordan@example.com` | Employer |
+To clean an existing DynamoDB Local database, run these commands from the repository root:
 
-Random initial passwords are generated into **`.local/actor-accounts.json`**, an ignored local file with owner-only permissions. Open that file locally to sign in. Credentials are never exposed by the UI or an API, and no email is sent to these reserved example addresses. Keep the file if you retain the database; existing passwords are never overwritten on restart. Set `SKILLPILOT_SEED_ACCOUNTS=false` to disable actor account creation.
+```bash
+uv run python -m scripts.remove_sample_accounts --dry-run
+uv run python -m scripts.remove_sample_accounts
+```
+
+The utility targets only known fixture IDs, their account/session records, owned sample jobs and derived matches. It preserves signup identities and their evidence, even when a display name matches a fixture. It accepts only a local DynamoDB endpoint and never targets AWS. Remove the obsolete ignored `.local/actor-accounts.json` credential file after cleanup.
 
 Signup asks only for name, email, password, and account purpose. After account creation, candidates answer adaptive LLM questions about their role, goal, projects, and tools. The private interview persists across reloads; they review and confirm extracted skills before a personalized assessment is generated. Employers start with an empty job list. Candidate discovery defaults to off. New profiles are non-synthetic, and candidates must submit actual assessments to add evidence.
 
@@ -23,8 +24,7 @@ Login failures use the same response for an unknown email and a wrong password, 
 Configuration:
 
 ```dotenv
-SKILLPILOT_SEED_ACCOUNTS=true
-SKILLPILOT_ACTOR_CREDENTIALS_PATH=.local/actor-accounts.json
+SKILLPILOT_SEED_ACCOUNTS=false
 SKILLPILOT_SECURE_COOKIES=false
 ```
 

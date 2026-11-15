@@ -4,9 +4,9 @@ Validated locally with explicit mock tests plus separate actual Bedrock/DynamoDB
 
 | Area | Status and evidence |
 | --- | --- |
-| Accounts | Simple email/password signup, three regular presentation actors, Argon2 hashing, expiring/revocable persisted sessions and account isolation |
+| Accounts | Email/password signup, no default sample accounts, Argon2 hashing, expiring/revocable persisted sessions and account isolation; disabled fixture logins/sessions rejected |
 | Adaptive onboarding | Bedrock asks follow-ups, extracts answer-grounded claims, and saves a revision-guarded review/confirmation; resumes across reloads |
-| Real job data | 68 public postings from nine employers saved in the project; six clearly synthetic fixture jobs |
+| Real job data | 68 public postings from nine employers active by default; synthetic jobs and fictional profiles confined to opt-in test fixtures |
 | Dynamic skill tags | All 68 public postings tagged by Nova 2 Lite: 574 tags across 106 skills; required/preferred status, exact validated excerpts and model/hash provenance |
 | Dynamic assessment | Personalized four-question objective checks, strict output validation, separate private keys and deterministic grading; client scores rejected |
 | Evidence persistence | Memory and single-table DynamoDB implementations; atomic submission, replay protection and conditional interview updates |
@@ -16,7 +16,7 @@ Validated locally with explicit mock tests plus separate actual Bedrock/DynamoDB
 | Multi-agent system | One Strands orchestrator and four specialists exposed as tools; typed summaries and observable delegation results |
 | Live Bedrock flow | Actual adaptive interview → confirmed skills → personalized Python assessment → server grading/persisted evidence → generated FastAPI lesson → Coach delegation reading the new evidence |
 | Offline AI | Explicit configuration with fixture provenance retained in records/API; actual Strands agent/tool loops remain in use |
-| Backend checks | 64 pytest tests passed; covers routing, scoring, persistence, matching, authentication, consent, generation failure and claim/tag grounding |
+| Backend checks | 67 pytest tests passed; covers routing, scoring, persistence, matching, authentication, consent, sample-account removal/defaults, generation failure and claim/tag grounding |
 | Browser checks | Six browser tests at desktop and iPhone sizes; adaptive signup plus assessment → learning → reassessment → marketplace/employer flow |
 | Frontend build | TypeScript and Vite production build passed |
 | AgentCore preparation | Local runtime entrypoint previously tested; image recipe prepared, nothing deployed |
@@ -44,4 +44,4 @@ The interface now uses a Linear-inspired dark default theme with a light alterna
 
 Home checks verify the default candidate landing page, no generation requests on load/reload, pending-assessment resume without regeneration, updated skill/competency snapshots after grading, featured-role detail navigation and mobile account/profile access. The existing conversation-history, Markdown, loader/error and employer flows still run at both desktop/mobile sizes.
 
-Customer-facing generation/provider badges and the chat header/footer have been removed. Sample profiles, sample postings and sample evidence remain identified so presentation polish does not misrepresent fictional records as real data. Underlying generation/model provenance is retained in persisted records and API responses.
+Customer-facing generation/provider badges and the chat header/footer have been removed. Normal startup excludes sample profiles, postings and evidence. Underlying generation/model provenance is retained in persisted records and API responses.

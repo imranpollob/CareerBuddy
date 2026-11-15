@@ -21,11 +21,11 @@ Grading and matching are deterministic Python. The Assessment specialist prepare
 | Data | Count | Provenance |
 | --- | --- | --- |
 | Public job postings | 68 | Nine employer boards, original URLs and retrieval dates retained; all LLM-tagged |
-| Synthetic job postings | 6 | Stable presentation fixtures with explicit skill requirements |
+| Synthetic job postings | 6 fixtures; 0 active by default | Isolated tests only |
 | Public early-career postings | 8 | Seven internship titles and one entry/graduate title; subset of the 68 |
-| Fictional profiles | 7 | Two candidate actors, one employer actor, three consenting comparison candidates, one private comparison candidate |
-| Precreated login accounts | 3 | Actor accounts only; additional users can sign up |
-| Seeded comparison assessments | 13 | Synthetic fixtures across four comparison profiles; explicitly labeled |
+| Fictional profiles | 7 fixtures; 0 active by default | Isolated tests only |
+| Precreated login accounts | 0 by default | Three fixture accounts available only with explicit test opt-in |
+| Seeded comparison assessments | 13 fixtures; 0 active by default | Isolated tests only; normal accounts build evidence through submissions |
 | Job skill tags | 574 | Bedrock-generated required/preferred tags, each with a validated source excerpt |
 | Distinct job skills | 106 | Normalized tags in the saved real-job sample |
 | Reference assessment questions | 28 | Seven fixed topics for offline fixtures and synthetic seed evidence only |
