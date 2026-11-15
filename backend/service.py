@@ -6,7 +6,7 @@ import json
 from backend.db import Repository, item
 from backend.models import Profile, ProfileUpdate, Job, JobCreate
 from backend.tools.assessments import BANK, LESSONS, public_questions, grade
-from backend.tools.jobs import SKILLS, requirements, normalize_skills, skill_label
+from backend.tools.jobs import SKILLS, requirements, normalize_skills, skill_label, role_family
 from backend.tools.matching import match
 
 
@@ -65,8 +65,8 @@ class Service:
         active_ids = {j["id"] for j in json.loads((Path(__file__).parent / "data" / "jobs.json").read_text())
                       if self.include_samples or not j["synthetic"]}
         # Removed public snapshots stay stored for history but leave the active sample.
-        return [j for j in self.repo.scan("DETAILS") if (j["id"] in active_ids or j.get("employer_id"))
-                and (self.include_samples or not j.get("synthetic",False))]
+        return [{**j,"role_family":j.get("role_family") or role_family(j["title"])} for j in self.repo.scan("DETAILS")
+                if (j["id"] in active_ids or j.get("employer_id")) and (self.include_samples or not j.get("synthetic",False))]
 
     def market(self, uid=None):
         jobs = self.jobs()
@@ -82,7 +82,8 @@ class Service:
 
     def create_job(self, employer_id, request: JobCreate):
         job = Job(**request.model_dump(), id=uuid4().hex, employer_id=employer_id,
-                  source_name="Employer posting", retrieved_at=now(), synthetic=self.profile(employer_id)["synthetic"])
+                  source_name="Employer posting", retrieved_at=now(), synthetic=self.profile(employer_id)["synthetic"],
+                  role_family=role_family(request.title))
         data = job.model_dump(mode="json")
         if self.intelligence:
             if request.required_skills:

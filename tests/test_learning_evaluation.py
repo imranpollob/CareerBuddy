@@ -89,9 +89,17 @@ def test_evaluation_rejects_ungrounded_skill_claims(candidate,monkeypatch):
     state=candidate.post('/api/learning/evaluation').json()
     monkeypatch.setattr(candidate.app.state.service.intelligence,'interview',lambda *args:OnboardingTurn(
         question='Which projects have you built?',current_role='Engineer',target_role='AI Engineer',candidate_track='career_switcher',
-        ready_to_review=False,claims=[{'skill':'rust','label':'Rust','evidence_excerpt':'I built Rust systems'}]))
-    assert candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'I use Python','target_role':'AI Engineer','career_goal':'find_job'}).status_code==400
-    assert candidate.get('/api/learning/evaluation').json()==state
+        ready_to_review=False,claims=[{'skill':'rust','label':'Rust','evidence_excerpt':'I built Rust systems'},
+                                     {'skill':'python','label':'Python','evidence_excerpt':'I use “Python”'},
+                                     {'skill':'sql','label':'SQL','evidence_excerpt':'queries databases with SQL daily'},
+                                     {'skill':'llm','label':'LLM applications','evidence_excerpt':'builds LLM apps'},
+                                     {'skill':'typescript','label':'TypeScript','evidence_excerpt':'need to learn TypeScript'}]))
+    response=candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'I use Python. I also write SQL reports. I want to learn LLM applications. I need to learn TypeScript.','target_role':'AI Engineer','career_goal':'find_job'})
+    # Ungrounded claims are dropped; quote-mark differences are tolerated; a paraphrased quote for a skill
+    # the user named is re-cited from the user's own sentence. The answer itself is never lost.
+    assert response.status_code==200
+    claims={c['skill']:c['evidence_excerpt'] for c in response.json()['claims']}
+    assert set(claims)=={'python','sql'} and claims['sql']=='I also write SQL reports.'
     assert candidate.get('/api/passport').json()['skills']==[]
 
 

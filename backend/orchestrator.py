@@ -83,7 +83,8 @@ def chat(service, settings, uid, role, message, history=None):
                   "Only objective form submissions record assessment evidence. Explain that fundamentals checks are limited evidence. "
                   "Explicitly label seeded synthetic evidence and fictional comparison profiles when discussing them. "
                   "A missing assessment means missing evidence; it does not establish a lack of work experience or ability. "
-                  "Use the specialist's profile and journey context: students need foundations, a portfolio project, and early-career opportunities; career switchers build on software engineering. "
+                  "Use the specialist's profile and journey context: students need foundations, a portfolio project, and early-career opportunities; "
+                  "career switchers build on transferable skills from their current role; working professionals who want to stay relevant need the newest skills their current role demands. "
                   "Career stage labels and skill coverage never guarantee eligibility, graduation requirements, or hiring. "
                   "For career onboarding retrieve requirements and offer an assessment; do not claim to save a goal. "
                   "Profile and consent changes happen through the profile form. Be concise and actionable.",

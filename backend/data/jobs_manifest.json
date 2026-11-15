@@ -1,30 +1,45 @@
 {
-  "real_postings": 68,
+  "real_postings": 181,
   "synthetic_postings": 6,
   "employers": {
-    "Anthropic": 10,
-    "Scale AI": 10,
-    "Databricks": 10,
-    "Figma": 6,
-    "Hex": 3,
-    "Cohere": 9,
+    "Airbnb": 12,
+    "Anthropic": 12,
+    "Baseten": 8,
+    "Cohere": 10,
+    "Coinbase": 13,
+    "Databricks": 11,
+    "Datadog": 5,
+    "Discord": 6,
+    "Duolingo": 8,
+    "Figma": 8,
+    "Hex": 7,
+    "Lyft": 11,
+    "MongoDB": 8,
+    "Notion": 7,
+    "Perplexity": 8,
+    "Pinterest": 8,
+    "Plaid": 6,
     "Ramp": 6,
-    "Perplexity": 10,
-    "Baseten": 4
+    "Reddit": 6,
+    "Robinhood": 8,
+    "Scale AI": 3,
+    "Stripe": 4,
+    "Supabase": 1,
+    "Dropbox": 5
   },
   "career_levels": {
-    "unspecified": 50,
-    "internship": 7,
-    "senior": 10,
-    "entry": 1
+    "unspecified": 67,
+    "internship": 37,
+    "senior": 72,
+    "entry": 5
   },
-  "llm_tagged_postings": 68,
-  "source_grounded_skill_tags": 574,
-  "distinct_tagged_skills": 106,
+  "llm_tagged_postings": 181,
+  "source_grounded_skill_tags": 1599,
+  "distinct_tagged_skills": 304,
   "tagging_models": [
     "us.amazon.nova-2-lite-v1:0"
   ],
-  "latest_tagged_at": "2026-11-15T04:59:48.827168+00:00",
+  "latest_tagged_at": "2026-11-15T10:12:08.403083+00:00",
   "source_apis": [
     "Greenhouse public Job Board API",
     "Ashby public Job Postings API"

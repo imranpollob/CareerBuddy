@@ -109,6 +109,7 @@ class Job(JobCreate):
     tagging_model: str | None = None
     tagged_at: str | None = None
     tagged_description_hash: str | None = None
+    role_family: str | None = None
 
 
 class AssessmentCreate(Contract):

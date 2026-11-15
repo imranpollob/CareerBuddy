@@ -184,7 +184,15 @@ Use the standard AWS credential chain or the ignored `.env`. Temporary credentia
 bash scripts/dev.sh
 ```
 
-This starts DynamoDB Local, creates only the local table if needed, and serves the API and frontend. Data persists under ignored `.local/dynamodb-data/`. Ctrl+C stops the processes the script started.
+This automatically stops existing listeners on API port 8000 and frontend port 5173, starts DynamoDB Local, creates only the local table if needed, and serves the API and frontend. Data persists under ignored `.local/dynamodb-data/`. Ctrl+C stops the processes the script started.
+
+The explicit restart command does the same thing:
+
+```bash
+bash scripts/dev.sh --restart
+```
+
+This requires `lsof` and stops any process listening on those two ports, force-stopping it after five seconds if needed. An existing DynamoDB Local instance on port 8001 is reused.
 
 - Application: http://127.0.0.1:5173
 - API/OpenAPI UI: http://127.0.0.1:8000/docs

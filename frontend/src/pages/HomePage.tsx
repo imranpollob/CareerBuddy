@@ -1,5 +1,5 @@
 import {ArrowRight,BookOpen,Check,ChevronRight,MessageCircle,ShieldCheck} from 'lucide-react'
-import {GOALS,skillLabel,type Assessment,type Dashboard,type Job,type LearningPlan,type Match,type Passport,type Topic} from '../api'
+import {GOALS,skillLabel,stageRank,type Assessment,type Dashboard,type Job,type LearningPlan,type Match,type Passport,type Topic} from '../api'
 
 type ActionDetails={title:string;description:string;label:string}
 export type HomeAction=ActionDetails&(
@@ -44,8 +44,7 @@ export function HomePage({data,plan,passport,matches,busy,onAction,onLearning,on
  // Only postings whose title fits the target role; unrelated roles are not "relevant".
  const roleIds=new Set(plan.role_job_ids||[])
  const sample=matches.filter(m=>roleIds.has(m.job.id))
- const early=sample.filter(m=>['entry','internship'].includes(m.job.career_level))
- const opportunities=(data.profile.candidate_track==='student'&&early.length?early:sample).slice(0,3)
+ const opportunities=[...sample].sort((a,b)=>stageRank(a.job,data.profile)-stageRank(b.job,data.profile)).slice(0,3)
  const passedCompetencies=passport.competencies.filter(c=>c.passed).length
  if(!plan.evaluation_id&&!plan.skills.length&&!passport.skills.length)return <div className="page-stack home-page"><div className="home-heading"><div><h1>Welcome, {data.profile.name.split(' ')[0]}.</h1><p>Your career journey starts here.</p></div></div><section className="card home-next-step"><div><p className="eyebrow">GET STARTED</p><h2>Your workspace is ready</h2><p className="home-next-description">Start with three short questions about your skills, projects, and goals. Your answers will shape your personal roadmap.</p></div><button className="button primary" disabled={busy} onClick={()=>onAction(action)}>Evaluate my profile<ArrowRight size={16}/></button></section><div className="home-snapshots"><section className="card"><h2>Learning roadmap</h2><p>Your roadmap will appear here after you create it.</p></section><section className="card"><h2>Skill Passport</h2><p>No assessments or verified skills yet.</p></section></div></div>
  return <div className="page-stack home-page">

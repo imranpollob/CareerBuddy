@@ -2,17 +2,31 @@ from collections import Counter
 import re
 
 SKILLS = {"python": "Python", "sql": "SQL", "llm": "LLM applications", "rag": "RAG",
-          "pytorch": "PyTorch", "aws": "AWS / Bedrock", "evaluation": "AI evaluation",
+          "pytorch": "PyTorch", "aws": "AWS", "evaluation": "AI evaluation",
           "javascript": "JavaScript", "typescript": "TypeScript", "react": "React", "fastapi": "FastAPI",
           "docker": "Docker", "git": "Git", "machine_learning": "Machine learning", "statistics": "Statistics",
           "tensorflow": "TensorFlow", "data_engineering": "Data engineering", "nlp": "Natural language processing",
           "kubernetes": "Kubernetes", "java": "Java", "cpp": "C++", "postgresql": "PostgreSQL",
-          "prompt_engineering": "Prompt engineering", "embeddings": "Embeddings", "linux": "Linux"}
+          "prompt_engineering": "Prompt engineering", "embeddings": "Embeddings", "linux": "Linux",
+          # Broader computer-science coverage: web, mobile, backend, data, infrastructure, quality.
+          "golang": "Go", "rust": "Rust", "kotlin": "Kotlin", "swift": "Swift", "ruby": "Ruby", "scala": "Scala",
+          "csharp": "C#", "node_js": "Node.js", "graphql": "GraphQL", "html": "HTML", "css": "CSS", "nextjs": "Next.js",
+          "vue": "Vue", "angular": "Angular", "ios": "iOS", "android": "Android", "gcp": "Google Cloud", "azure": "Azure",
+          "terraform": "Terraform", "ci_cd": "CI/CD", "spark": "Apache Spark", "airflow": "Airflow", "kafka": "Kafka",
+          "redis": "Redis", "mongodb": "MongoDB", "distributed_systems": "Distributed systems", "system_design": "System design",
+          "microservices": "Microservices", "rest_api": "REST APIs", "accessibility": "Accessibility",
+          "performance_optimization": "Performance optimization", "playwright": "Playwright", "jest": "Jest",
+          "application_security": "Application security", "data_analysis": "Data analysis"}
 ALIASES = {"python3": "python", "python 3": "python", "torch": "pytorch", "bedrock": "aws",
            "amazon bedrock": "aws", "amazon web services": "aws", "llms": "llm",
            "large language models": "llm", "retrieval augmented generation": "rag",
            "retrieval-augmented generation": "rag", "evals": "evaluation", "c++": "cpp", "c#": "csharp",
-           "ml": "machine_learning", "machine learning": "machine_learning", "postgres": "postgresql"}
+           "ml": "machine_learning", "machine learning": "machine_learning", "postgres": "postgresql",
+           "go lang": "golang", "node.js": "node_js", "nodejs": "node_js", "next.js": "nextjs", "vue.js": "vue",
+           "google cloud": "gcp", "ci/cd": "ci_cd", "apache spark": "spark", "pyspark": "spark",
+           "distributed systems": "distributed_systems", "system design": "system_design", "rest api": "rest_api",
+           "restful": "rest_api", "appsec": "application_security", "application security": "application_security",
+           "data analysis": "data_analysis", "swiftui": "swift", "wcag": "accessibility"}
 # Model-generated IDs drift ("web_performance_optimization" vs "performance_optimization").
 # Matching compares canonical IDs so assessment evidence lines up with job requirements.
 CANONICAL_ALIASES = {"web_performance": "performance_optimization", "frontend_performance": "performance_optimization",
@@ -72,15 +86,61 @@ def extract_skills(text):
 
 
 def requirements(jobs):
-    counts = Counter(skill for job in jobs for skill in set(job["required_skills"]))
+    # Count canonical IDs so naming variants of one skill aggregate into one demand signal.
+    skills_by_job = {job["id"]: {canonical_skill(s) for s in job["required_skills"]} for job in jobs}
+    counts = Counter(skill for skills in skills_by_job.values() for skill in skills)
     return [{"skill": skill, "label": skill_label(skill), "job_count": count,
              "sources": [{"job_id": j["id"], "url": j["source_url"], "synthetic": j["synthetic"],
-                          "retrieved_at": j["retrieved_at"]} for j in jobs if skill in j["required_skills"]]}
+                          "retrieved_at": j["retrieved_at"]} for j in jobs if skill in skills_by_job[j["id"]]]}
             for skill, count in counts.most_common()]
 
 
+# Ordered: the first matching family wins ("Software Engineer, Frontend" is frontend).
+ROLE_FAMILIES = [
+    ("security", r"security|appsec|threat|detection engineer|\bsecops\b"),
+    ("ml_ai", r"machine learning|\bml\b|\bai\b|\bllm\b|applied scientist|research (engineer|scientist)|inference|deep learning|\bnlp\b|computer vision|ml ?ops|post-training"),
+    ("data_science", r"data scien|data analyst|business analyst|analytics|quantitative|statistician"),
+    ("data_engineering", r"data engineer|data platform|data infrastructure|\betl\b|data pipeline"),
+    ("mobile", r"\bios\b|android|mobile|swift|kotlin"),
+    ("frontend", r"front[- ]?end|\bui\b|\bweb (engineer|developer)|design engineer|react developer"),
+    ("fullstack", r"full[- ]?stack"),
+    ("devops_sre", r"site reliability|\bsre\b|devops|infrastructure|platform engineer|cloud engineer|reliability|production engineer|developer productivity|build engineer|systems engineer"),
+    ("qa", r"\bqa\b|quality assurance|^(senior |staff )?(software )?quality engineer|test engineer|\bsdet\b|test automation|engineer in test"),
+    ("backend", r"back[- ]?end|\bapi\b|distributed systems|server|payments engineer"),
+    ("software", r"software (engineer|developer)|\bdeveloper\b|member of technical staff|\bswe\b|engineer"),
+]
+ROLE_FAMILY_LABELS = {"security": "Security", "ml_ai": "AI / ML", "data_science": "Data science & analytics",
+                      "data_engineering": "Data engineering", "mobile": "Mobile", "frontend": "Frontend",
+                      "fullstack": "Full stack", "devops_sre": "DevOps / SRE / Infrastructure", "qa": "Quality / testing",
+                      "backend": "Backend", "software": "General software"}
+# Which job families serve a target-role family (a generalist SWE fits many teams).
+RELATED_FAMILIES = {"frontend": {"frontend", "fullstack"}, "backend": {"backend", "fullstack", "software"},
+                    "fullstack": {"fullstack", "frontend", "backend"},
+                    "software": {"software", "backend", "fullstack", "frontend", "mobile"}}
+NON_ENGINEERING = (r"manager|director|head of|\bvp\b|vice president|recruit|account executive|sales|marketing|counsel|attorney|accountant"
+                   r"|designer(?! engineer)|support|solutions? (engineer|architect|consultant)|customer|partner|business development"
+                   r"|operations|demand planning|hardware|manufacturing|data center|\bav engineer|industrialization|business systems"
+                   r"|\bit systems|fellows|annotation|adoption specialist|policy|\blead, ")
+
+
+def role_family(title):
+    """Classify a job title (or a target role) into a computer-science role family."""
+    text = (title or "").casefold()
+    if not text.strip() or re.search(NON_ENGINEERING, text):
+        return None
+    for family, pattern in ROLE_FAMILIES:
+        if re.search(pattern, text):
+            return family
+    return None
+
+
 def jobs_for_role(jobs, target_role):
-    """Conservative title coverage; never treat a different role's sample as demand."""
+    """Jobs that serve the target role: same CS role family, else exact title phrase."""
+    family = role_family(target_role)
+    if family:
+        wanted = RELATED_FAMILIES.get(family, {family})
+        return [job for job in jobs if (job.get("role_family") or role_family(job["title"])) in wanted]
+
     def words(value):
         return ' '.join(re.findall(r'[a-z0-9]+',value.casefold()))
     role=words(target_role)

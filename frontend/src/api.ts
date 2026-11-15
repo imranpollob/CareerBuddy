@@ -29,7 +29,12 @@ export interface Job {
   career_level: CareerLevel
   skill_tags: {skill:string;label:string;requirement:'required'|'preferred';evidence_excerpt:string}[]
   tagging_method: 'keywords'|'llm'|'mock'|'manual'; tagging_model?:string; tagged_at?:string
+  role_family?: string|null
 }
+// Mirrors backend ROLE_FAMILY_LABELS (computer-science role areas).
+export const ROLE_FAMILIES: Record<string,string> = {frontend:'Frontend',backend:'Backend',fullstack:'Full stack',software:'General software',
+  mobile:'Mobile',ml_ai:'AI / ML',data_engineering:'Data engineering',data_science:'Data science & analytics',
+  devops_sre:'DevOps / SRE / Infrastructure',security:'Security',qa:'Quality / testing'}
 export interface Match { job: Job; supported: string[]; missing: string[]; supported_count: number; required_count: number; evidence: Evidence[]; explanation: string }
 export interface Milestone { skill: string; title: string; status: string; job_count: number; estimated_minutes: number; lesson_completed: boolean }
 export interface Roadmap { id: string; target_role: string; milestones: Milestone[]; note: string }
@@ -47,7 +52,7 @@ export interface Passport {skills:Evidence[];competencies:(Evidence&{id:string;t
 export interface Conversation {revision:number;messages:{role:'user'|'assistant';text:string;created_at:string;specialists:string[]}[]}
 
 // Mirrors backend SKILLS so labels match before (or without) the catalog loading, e.g. for employers.
-const BASE_LABELS: Record<string, string> = {python:'Python', sql:'SQL', llm:'LLM applications', rag:'RAG', pytorch:'PyTorch', aws:'AWS / Bedrock', evaluation:'AI evaluation',
+const BASE_LABELS: Record<string, string> = {python:'Python', sql:'SQL', llm:'LLM applications', rag:'RAG', pytorch:'PyTorch', aws:'AWS', evaluation:'AI evaluation',
   javascript:'JavaScript', typescript:'TypeScript', react:'React', fastapi:'FastAPI', docker:'Docker', git:'Git', machine_learning:'Machine learning',
   statistics:'Statistics', tensorflow:'TensorFlow', data_engineering:'Data engineering', nlp:'Natural language processing', kubernetes:'Kubernetes',
   java:'Java', cpp:'C++', postgresql:'PostgreSQL', prompt_engineering:'Prompt engineering', embeddings:'Embeddings', linux:'Linux'}
@@ -56,6 +61,15 @@ export function setSkillCatalog(catalog:Record<string,string>={}){for(const key 
 export const LEVELS: Record<CareerLevel,string> = {internship:'Internship',entry:'Entry / graduate',mid:'Mid-level',senior:'Senior',unspecified:'Level not specified'}
 export const TRACKS: Record<CandidateTrack,string> = {unspecified:'Not specified',career_switcher:'Career transition',student:'Student / graduate',experienced:'Experienced engineer',employer:'Employer'}
 export function skillLabel(skill:string){return LABELS[skill] || skill.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}
+// Career-stage fit (mirrors the backend marketplace ranking): early-career roles first for
+// students and people with 0–1 years; internships last for people with 3+ years.
+export function stageRank(job:Pick<Job,'career_level'>,profile:Pick<Profile,'candidate_track'|'years_experience'>){
+  const years=profile.years_experience,early=profile.candidate_track==='student'||(years!=null&&years<=1)
+  const isEarly=['internship','entry'].includes(job.career_level)
+  if(early)return isEarly?0:1
+  if(years!=null&&years>=3&&job.career_level==='internship')return 1
+  return 0
+}
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message) } }
 

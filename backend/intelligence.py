@@ -69,7 +69,9 @@ class Intelligence:
             "Conduct a three-question learning profile evaluation. Ask ONE specific question at a time, adapting to prior answers and profile background. "
             "Prioritize the target role and goal, skills personally used in projects, and learning priorities within these three answers. "
             "Discover career purpose (stay_relevant in current role, find_job, or switch_careers), current role/studies, target role, projects, tools, and what the user personally did. "
-            "Extract only positively claimed skills, never desired or explicitly missing skills. Include an EXACT excerpt from a USER answer supporting each skill. "
+            "ALWAYS fill claims: list EVERY language, framework, database, cloud service and tool the user says they already use or have built with, across all answers so far "
+            "(for example 'I write Python and Java services with PostgreSQL' gives python, java and postgresql). Return an empty list only if the user named none. "
+            "Never include skills they only want to learn or say they lack. Each claim's evidence_excerpt is a short phrase copied word for word from a USER answer. "
             "Each claim's label is the human-readable skill name (for example 'React'), never a description such as 'used in project'. "
             "Use consistent lowercase snake_case skill IDs; reuse a known_skills ID whenever one fits, and never add qualifiers such as web_ or _testing. "
             "No skill is assessed yet. Each follow-up must explore something NEW: question 2 a concrete project and the person's own contribution, "
@@ -154,6 +156,8 @@ class Intelligence:
             'Supplied requirements come only from matching saved job titles. When absent, produce general learning guidance, not market-demand claims. '
             'Personalize the order to the interview, current skills, learning gaps, target role and background. '
             'Distinguish skills the user has from skills they want to learn. Use assessment evidence when available. '
+            'profile.claimed_skills are skills the person already uses: do not make them the first focus skill; prefer gaps the target role demands and the interview names. '
+            'Match difficulty to profile.expertise_level and years_experience: beginners get foundations, advanced people get current, advanced topics. '
             'Write summary as two or three plain sentences addressed to the learner as "you", explaining the starting point and priorities. '
             'Never refer to "the user" or the person by name, and never show snake_case IDs. Skills the person only described are self-reported: '
             'say "you described" or "you have worked with", never "demonstrated" or "verified". Do not contradict yourself about strengths and gaps. '

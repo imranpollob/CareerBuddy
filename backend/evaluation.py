@@ -1,9 +1,10 @@
 """Private, revision-guarded learning interviews and replaceable roadmaps."""
+import re
 from uuid import uuid4
 from backend.db import item, Conflict
 from backend.models import LearningEvaluation, Profile
 from backend.intelligence import normalized_text
-from backend.tools.jobs import jobs_for_role, requirements
+from backend.tools.jobs import jobs_for_role, requirements, canonical_skill
 
 
 class Evaluation:
@@ -44,9 +45,33 @@ class Evaluation:
         messages=state['messages']+[{'role':'user','content':answer}]
         count=sum(m['role']=='user' for m in messages)
         turn=self.service.intelligence.interview({**self.service.profile(uid),'target_role':state['target_role'],'career_goal':state['career_goal'],'goal_confirmed':True},messages)
-        source=normalized_text(' '.join(m['content'] for m in messages if m['role']=='user'))
-        if any(not normalized_text(c.evidence_excerpt) or normalized_text(c.evidence_excerpt) not in source for c in turn.claims):
-            raise ValueError('A proposed skill was not supported by your answers. Please retry.')
+        # Every stored claim must quote the user's own words. An ungrounded claim is dropped
+        # instead of failing the whole answer, which would force the user to retype it.
+        def loose(text):
+            return re.sub(r'[^a-z0-9]+',' ',normalized_text(text)).strip()
+        user_text=' '.join(m['content'] for m in messages if m['role']=='user')
+        source=loose(user_text)
+        # Only sentences about what the user already does; never goals or things they want to learn.
+        aspiration=re.compile(r"\b(learn|learning|want|wants|need|needs|would like|hope|plan|get better|improve|interested|target role|career purpose)\b",re.I)
+        all_sentences=[s.strip() for s in re.split(r'(?<=[.!?])\s+',user_text) if s.strip()]
+        sentences=[s for s in all_sentences if not aspiration.search(s)]
+        grounded=[]
+        for c in turn.claims:
+            quote=loose(c.evidence_excerpt)
+            if quote and f' {quote} ' in f' {source} ':
+                # A verbatim quote from "I need to learn TypeScript" is a goal, not a skill.
+                if any(f' {quote} ' in f' {loose(s)} ' for s in sentences) or not any(f' {quote} ' in f' {loose(s)} ' for s in all_sentences):
+                    grounded.append(c)
+                continue
+            # The quote was paraphrased, but the skill is named in the user's own words:
+            # keep it and cite the user's actual sentence as evidence.
+            names={loose(c.label),loose(c.skill.replace('_',' '))}-{''}
+            sentence=next((s for s in sentences if any(f' {n} ' in f' {loose(s)} ' for n in names)),None)
+            if sentence:
+                grounded.append(c.model_copy(update={'evidence_excerpt':sentence[:240]}))
+        # Models occasionally leak markup ("…internship?</") into the question text.
+        question=re.sub(r'<[^>]*>?','',turn.question).strip()
+        turn=turn.model_copy(update={'claims':grounded,'question':question or turn.question})
         state={**state,**turn.model_dump(exclude={'ready_to_review'}),'revision':revision+1,
                'target_role':state['target_role'],'career_goal':state['career_goal'],'status':'review' if count==3 else 'interview','question_number':min(count+1,3),
                'messages':messages+[{'role':'assistant','content':turn.question}]}
@@ -63,6 +88,10 @@ class Evaluation:
         role_jobs=jobs_for_role(self.service.jobs(),profile['target_role'])
         role_requirements=requirements(role_jobs)
         proposed=self.service.intelligence.roadmap(profile,state['messages'],role_requirements,self.service.skills(uid))
+        # Start with skills the person does not already use; known ones move to the end.
+        known={canonical_skill(s) for s in profile['claimed_skills']}
+        ordered=sorted(proposed.focus_skills,key=lambda s:canonical_skill(s) in known)
+        proposed=proposed.model_copy(update={'focus_skills':ordered})
         skill=proposed.focus_skills[0]
         generated=self.service.intelligence.skill_path(profile,skill,role_requirements)
         path={'skill':skill,'revision':0,'evaluation_id':state['id'],'rationale':generated.rationale,
