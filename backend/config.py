@@ -9,4 +9,8 @@ class Settings(BaseSettings):
     model_id: str = "us.amazon.nova-2-lite-v1:0"
     table_name: str = "SkillPilot"
     dynamodb_endpoint: str = "http://localhost:8001"
+    seed_accounts: bool = True
+    actor_credentials_path: str = ".local/actor-accounts.json"
+    secure_cookies: bool = False
+    session_seconds: int = 14400
 

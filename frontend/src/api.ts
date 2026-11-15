@@ -1,5 +1,4 @@
 export type Role = 'candidate' | 'employer'
-export type DemoIdentity = 'candidate' | 'student' | 'employer'
 export type CareerLevel = 'internship' | 'entry' | 'mid' | 'senior' | 'unspecified'
 export type CandidateTrack = 'career_switcher' | 'student' | 'experienced' | 'employer'
 export interface Profile {
@@ -7,6 +6,7 @@ export interface Profile {
   claimed_skills: string[]; marketplace_opt_in: boolean; synthetic: boolean
   candidate_track: CandidateTrack
 }
+export interface AccountSession { profile: Profile; email: string; mode: 'mock' | 'bedrock' }
 export type ProfileUpdate = Pick<Profile, 'name' | 'current_role' | 'target_role' | 'claimed_skills' | 'marketplace_opt_in'>
 export interface Evidence { skill: string; assessment_id: string; score: number; passed: boolean; assessed_at: string; scope: string; synthetic: boolean }
 export interface Question { id: string; prompt: string; choices: string[] }
@@ -31,12 +31,14 @@ export interface Health { ai_mode: 'mock' | 'bedrock'; repository: string; model
 export interface ChatResponse { message: string; mode: 'mock' | 'bedrock'; delegations: {specialist: string; tools: string[]; result: {summary: string; data: Record<string, unknown>}}[] }
 
 export const LABELS: Record<string, string> = {python:'Python', sql:'SQL', llm:'LLM applications', rag:'RAG', pytorch:'PyTorch', aws:'AWS / Bedrock', evaluation:'AI evaluation'}
-export const LEVELS: Record<CareerLevel,string> = {internship:'Internship',entry:'Entry / graduate',mid:'Mid-level demo',senior:'Senior',unspecified:'Level not stated in title'}
+export const LEVELS: Record<CareerLevel,string> = {internship:'Internship',entry:'Entry / graduate',mid:'Mid-level',senior:'Senior',unspecified:'Level not specified'}
 export const TRACKS: Record<CandidateTrack,string> = {career_switcher:'Career transition',student:'Student / graduate',experienced:'Experienced engineer',employer:'Employer'}
+
+export class ApiError extends Error { constructor(message: string, public status: number) { super(message) } }
 
 export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {method, credentials:'include', headers: body === undefined ? {} : {'Content-Type':'application/json'}, body: body === undefined ? undefined : JSON.stringify(body)})
   const data = await response.json().catch(() => ({detail: 'The backend did not return a valid response.'}))
-  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Please check the form fields and try again.')
+  if (!response.ok) throw new ApiError(typeof data.detail === 'string' ? data.detail : 'Please check the form fields and try again.',response.status)
   return data as T
 }

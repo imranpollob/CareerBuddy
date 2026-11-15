@@ -17,7 +17,7 @@ class Repository(Protocol):
     def get(self, pk: str, sk: str) -> dict | None: ...
     def partition(self, pk: str, prefix: str = "") -> list[dict]: ...
     def scan(self, sk: str) -> list[dict]: ...
-    def write(self, items: list[dict], pending: tuple[str, str] | None = None) -> None: ...
+    def write(self, items: list[dict], pending: tuple[str, str] | None = None, absent: tuple[str, str] | None = None) -> None: ...
 
 
 def item(pk: str, sk: str, data: dict) -> dict:
@@ -45,8 +45,10 @@ class MemoryRepository:
         with self.lock:
             return [deepcopy(v["data"]) for (_, s), v in sorted(self.items.items()) if s == sk]
 
-    def write(self, items, pending=None):
+    def write(self, items, pending=None, absent=None):
         with self.lock:
+            if absent and absent in self.items:
+                raise Conflict("Account already exists")
             if pending and self.get(*pending).get("status") != "pending":
                 raise Conflict("Assessment has already been submitted")
             for value in items:
@@ -84,7 +86,7 @@ class DynamoRepository:
                 return result
             args["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
-    def write(self, items, pending=None):
+    def write(self, items, pending=None, absent=None):
         # Resource client performs DynamoDB serialization, including nested data.
         writes = []
         for value in items:
@@ -93,10 +95,12 @@ class DynamoRepository:
                 put.update(ConditionExpression="#d.#s = :pending",
                            ExpressionAttributeNames={"#d": "data", "#s": "status"},
                            ExpressionAttributeValues={":pending": "pending"})
+            if absent == (value["PK"], value["SK"]):
+                put.update(ConditionExpression="attribute_not_exists(PK)")
             writes.append({"Put": put})
         try:
             self.client.transact_write_items(TransactItems=writes)
         except ClientError as exc:
             if exc.response["Error"]["Code"] == "TransactionCanceledException":
-                raise Conflict("Assessment has already been submitted") from exc
+                raise Conflict("Record already exists or has changed") from exc
             raise

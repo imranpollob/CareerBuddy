@@ -42,3 +42,21 @@ def test_memory_concurrent_submission_is_once_only():
             return "conflict"
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(lambda _:submit(),range(2)))==["conflict","saved"]
+
+
+def test_account_and_session_persist_across_auth_instances(repository):
+    from backend.auth import Auth
+    from backend.models import SignupRequest, LoginRequest
+    from backend.config import Settings
+    settings=Settings(seed_accounts=False)
+    auth=Auth(Service(repository),settings)
+    request=SignupRequest(email="persist@example.com",password="Persistence test password 2026!",name="Persisted User",current_role="Engineer")
+    account=auth.signup(request)
+    token=auth.create_session(account)
+    restored=Auth(Service(repository),settings)
+    assert restored.session(token)["uid"]==account["uid"]
+    assert restored.login(LoginRequest(email=request.email,password=request.password))["uid"]==account["uid"]
+    restored.logout(token)
+    from backend.auth import InvalidCredentials
+    with pytest.raises(InvalidCredentials):
+        auth.session(token)

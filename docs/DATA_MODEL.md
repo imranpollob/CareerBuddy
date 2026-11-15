@@ -22,18 +22,19 @@ Matching is set intersection: supported requirements = normalized job skills int
 
 Employer discovery checks ownership of the selected posting and the candidate's current opt-in on every request. It returns only display name, current/target role, relevant evidence summaries, and skill gaps. Answers, private chat, claimed skills, and learning history are excluded. No discovery cache is persisted. The demo candidate profile is synthetic, but assessments taken through the UI are actually graded; only seeded evidence is synthetic.
 
-The backend's Pydantic contracts are in `backend/models.py`; frontend response interfaces are in `frontend/src/api.ts`. `/docs` exposes FastAPI's OpenAPI UI. Routes derive identity from an HttpOnly demo session cookie. There are intentionally three public demo login endpoints bound to fixed identities: engineer (`candidate`), `student`, and `employer`. Both candidate identities have the candidate role; user IDs are server-controlled. This is a local demonstration, not production authentication.
+The backend's Pydantic contracts are in `backend/models.py`; frontend response interfaces are in `frontend/src/api.ts`. `/docs` exposes FastAPI's OpenAPI UI. Routes derive identity from an expiring, HttpOnly account session cookie. Email/password signup and login support new users; three regular actor accounts are precreated. Passwords are hashed with Argon2, session tokens are stored only as digests, and logout revokes the session. See [authentication](AUTHENTICATION.md) for the additional account/session records in this same table.
 
 | Route | Role | Purpose |
 | --- | --- | --- |
-| `POST /api/demo/candidate`, `POST /api/demo/student`, `POST /api/demo/employer` | Public | Start a fixed server-controlled demo session |
+| `POST /api/auth/signup`, `POST /api/auth/login` | Public | Create an account or verify credentials; establish an expiring session |
+| `POST /api/auth/logout`, `GET /api/session` | Account | Revoke or inspect the current account session |
 | `GET /api/dashboard`, `PATCH /api/profile` | Candidate | Own profile, skills, roadmap, assessment history; update only allowed profile fields |
 | `POST /api/assessments`, `GET /api/assessments/{id}` | Candidate | Create/read own attempt, no pending answer key |
 | `POST /api/assessments/{id}/submit` | Candidate | Validate answers, grade in Python, atomically store evidence |
 | `GET /api/roadmap`, `GET /api/lessons/{skill}` | Candidate | Derived roadmap and working lesson |
 | `POST /api/lessons/{skill}/complete` | Candidate | Mark lesson practiced and prepare reassessment |
 | `GET /api/matches` | Candidate | Own evidence compared with job requirements |
-| `POST /api/jobs`, `GET /api/employer/jobs` | Employer | Create a labeled demo posting; list own jobs |
+| `POST /api/jobs`, `GET /api/employer/jobs` | Employer | Create a posting; list own jobs |
 | `GET /api/employer/jobs/{id}/candidates` | Employer | Discover consenting profiles for an owned job |
 | `POST /api/chat` | Authenticated | Orchestrator response and actual specialist/tool delegation results |
 | `GET /api/jobs`, `GET /api/market` | Authenticated | Sample postings and deterministic skill frequencies |

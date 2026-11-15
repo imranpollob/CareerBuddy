@@ -53,7 +53,7 @@ class Service:
 
     def create_job(self, employer_id, request: JobCreate):
         job = Job(**request.model_dump(), id=uuid4().hex, employer_id=employer_id,
-                  source_name="Employer demo posting", retrieved_at=now(), synthetic=True)
+                  source_name="Employer posting", retrieved_at=now(), synthetic=self.profile(employer_id)["synthetic"])
         data = job.model_dump(mode="json")
         self.repo.write([item(f"JOB#{job.id}", "DETAILS", data)])
         return data

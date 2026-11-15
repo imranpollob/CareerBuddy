@@ -2,16 +2,9 @@
 
 No AWS infrastructure has been created. Local Bedrock inference uses the existing hackathon account. The DynamoDB table used during development is on the local Java emulator.
 
-`backend/main.py` wraps the same orchestrator and four specialists in `BedrockAgentCoreApp` with an `@app.entrypoint`. Its input is `{"message":"Prepare a Python assessment"}` and output is the typed chat response. The future runtime entrypoint is fixed to the candidate demo identity and accepts no caller-selected role or user ID. FastAPI currently calls the orchestrator in process; it does not forward requests to a deployed runtime. A real authenticated identity handoff is required before enabling employer operations remotely.
+`backend/main.py` wraps the same orchestrator and specialists in `BedrockAgentCoreApp`. Its input contains `message` and a secret `session_token`; it validates that existing application session and derives the user and role from stored records. It no longer assumes a fixed candidate identity. The future FastAPI-to-runtime forwarding integration remains unperformed; FastAPI currently calls the orchestrator locally. Do not send credentials or session tokens to a public endpoint. No runtime has been deployed.
 
-For a local runtime check only:
-
-```bash
-uv run python -m backend.main
-curl -X POST http://127.0.0.1:8080/invocations \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Hello"}'
-```
+The runtime's local module can be started with `uv run python -m backend.main`. Runtime health remains separate from invoking the authenticated entrypoint. See the authentication documentation for account/session storage.
 
 `deployment/Dockerfile` and its pinned requirements prepare a single application image. Build from the repository root, targeting `linux/arm64` for AgentCore, only after Docker is available. The image copies only `backend/` and dependencies; `.env`, `.local`, and credentials are excluded. The image itself has not been built here because Docker is not installed.
 

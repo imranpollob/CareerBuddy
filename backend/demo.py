@@ -1,9 +1,4 @@
-"""Fixed demo identities and journey guidance; never supplied as role claims."""
-DEMO_IDENTITIES = {
-    "candidate": ("candidate-demo", "candidate"),
-    "student": ("student-demo", "candidate"),
-    "employer": ("employer-demo", "employer"),
-}
+"""Career-planning templates used with each signed-in user's own profile."""
 
 JOURNEYS = {
     "career_switcher": {

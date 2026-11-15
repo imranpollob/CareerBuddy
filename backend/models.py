@@ -1,9 +1,30 @@
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StrictInt, SecretStr, EmailStr, field_validator
 
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class LoginRequest(Contract):
+    email: EmailStr = Field(max_length=254)
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
+class SignupRequest(LoginRequest):
+    password: SecretStr = Field(min_length=12, max_length=128)
+    name: str = Field(min_length=1, max_length=80)
+    role: Literal["candidate", "employer"] = "candidate"
+    current_role: str = Field(min_length=1, max_length=120)
+    target_role: str = Field(default="AI Engineer", min_length=1, max_length=120)
+    candidate_track: Literal["career_switcher", "student", "experienced"] = "career_switcher"
+    claimed_skills: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("claimed_skills")
+    @classmethod
+    def valid_claims(cls, values):
+        from backend.tools.jobs import normalize_skills
+        return normalize_skills(values)
 
 
 class ProfileUpdate(Contract):
@@ -25,6 +46,12 @@ class Profile(ProfileUpdate):
     role: Literal["candidate", "employer"]
     synthetic: bool = True
     candidate_track: Literal["career_switcher", "student", "experienced", "employer"] = "career_switcher"
+
+
+class AccountSession(Contract):
+    profile: Profile
+    email: EmailStr
+    mode: Literal["mock", "bedrock"]
 
 
 class JobCreate(Contract):
@@ -61,6 +88,10 @@ class Submission(Contract):
 
 class ChatRequest(Contract):
     message: str = Field(min_length=1, max_length=3000)
+
+
+class RuntimeRequest(ChatRequest):
+    session_token: SecretStr = Field(min_length=32, max_length=128)
 
 
 class SpecialistResult(Contract):

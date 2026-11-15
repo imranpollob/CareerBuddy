@@ -21,12 +21,12 @@ def test_assessment_learning_matching_and_consent(candidate):
     profile=dashboard["profile"]
     update={k:profile[k] for k in ["name","current_role","target_role","claimed_skills","marketplace_opt_in"]}
     candidate.patch("/api/profile",json={**update,"marketplace_opt_in":True})
-    candidate.post("/api/demo/employer")
+    candidate.login("employer")
     discovered=candidate.get("/api/employer/jobs/demo-python-engineer/candidates").json()
     assert any(c["id"]=="candidate-demo" and c["evidence"][0]["assessment_id"]==new["id"] for c in discovered)
     job=candidate.post("/api/jobs",json={"title":"Python AI Builder","company":"Demo Team","description":"Build reliable AI applications with Python and RAG.","required_skills":["python","rag"]})
     assert job.status_code==200 and job.json()["synthetic"] is True
-    candidate.post("/api/demo/candidate")
+    candidate.login("candidate")
     candidate.patch("/api/profile",json={**update,"marketplace_opt_in":False})
-    candidate.post("/api/demo/employer")
+    candidate.login("employer")
     assert all(c["id"]!="candidate-demo" for c in candidate.get("/api/employer/jobs/demo-python-engineer/candidates").json())

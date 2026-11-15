@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import logging
-import secrets
 from threading import Lock
 
 from dotenv import load_dotenv
@@ -16,7 +15,8 @@ from backend.models import ProfileUpdate, JobCreate, AssessmentCreate, Submissio
 from backend.models import Profile, Job, DashboardRecord, MarketRecord, AssessmentRecord, RoadmapRecord, LessonRecord, MatchRecord, CandidateMatch
 from backend.orchestrator import chat
 from backend.service import Service
-from backend.demo import DEMO_IDENTITIES
+from backend.auth import Auth, InvalidCredentials, TooManyAttempts, digest
+from backend.models import LoginRequest, SignupRequest, AccountSession
 
 ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"]
 
@@ -25,6 +25,7 @@ ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8
 class Session:
     uid: str
     role: str
+    email: str
     history: list = field(default_factory=list)
     lock: Lock = field(default_factory=Lock)
 
@@ -36,15 +37,18 @@ def create_app(repo=None, settings=None):
         repo = MemoryRepository() if settings.repository == "memory" else DynamoRepository(
             settings.table_name, settings.dynamodb_endpoint if settings.repository == "dynamodb-local" else None)
     service = Service(repo)
+    auth = Auth(service, settings)
     sessions = {}
 
     @asynccontextmanager
     async def lifespan(app):
         service.seed()
+        auth.seed_actors()
         yield
 
     app = FastAPI(title="SkillPilot", version="0.1.0", lifespan=lifespan)
     app.state.service = service
+    app.state.auth = auth
     app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=True,
                        allow_methods=["GET", "POST", "PATCH"], allow_headers=["Content-Type"])
 
@@ -69,6 +73,14 @@ def create_app(repo=None, settings=None):
     async def conflict(request, exc):
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
+    @app.exception_handler(InvalidCredentials)
+    async def invalid_credentials(request, exc):
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(TooManyAttempts)
+    async def throttled(request, exc):
+        return JSONResponse(status_code=429, content={"detail": str(exc)}, headers={"Retry-After": "300"})
+
     async def storage_error(request, exc):
         logging.getLogger(__name__).warning("Storage unavailable: %s", type(exc).__name__)
         return JSONResponse(status_code=503, content={"detail": "Storage is unavailable. Check the configured repository and local service."})
@@ -77,10 +89,15 @@ def create_app(repo=None, settings=None):
     app.add_exception_handler(BotoCoreError, storage_error)
 
     def authenticated(request: Request):
-        session = sessions.get(request.cookies.get("skillpilot_session"))
-        if session is None:
-            raise HTTPException(401, "Choose a demo session first")
-        return session
+        token = request.cookies.get("skillpilot_session")
+        account = auth.session(token)
+        key = digest(token)
+        profile = service.profile(account["uid"])
+        if key not in sessions:
+            if len(sessions) >= 256:
+                sessions.pop(next(iter(sessions)))
+            sessions[key] = Session(uid=account["uid"], role=profile["role"], email=account["email"])
+        return sessions[key]
 
     def candidate(session=Depends(authenticated)):
         if session.role != "candidate":
@@ -92,15 +109,15 @@ def create_app(repo=None, settings=None):
             raise HTTPException(403, "Employer session required")
         return session
 
-    def start_session(identity, request, response):
+    def start_session(account, request, response):
         previous = request.cookies.get("skillpilot_session")
         if previous:
-            sessions.pop(previous, None)
-        token = secrets.token_urlsafe(32)
-        uid, role = DEMO_IDENTITIES[identity]
-        sessions[token] = Session(uid=uid, role=role)
-        response.set_cookie("skillpilot_session", token, httponly=True, samesite="strict", max_age=14400)
-        return {"profile": service.profile(uid), "mode": settings.ai_mode}
+            auth.logout(previous)
+            sessions.pop(digest(previous), None)
+        token = auth.create_session(account)
+        response.set_cookie("skillpilot_session", token, httponly=True, samesite="strict",
+                            secure=settings.secure_cookies, max_age=settings.session_seconds)
+        return {"profile": service.profile(account["uid"]), "email": account["email"], "mode": settings.ai_mode}
 
     @app.get("/api/health")
     def health():
@@ -108,21 +125,28 @@ def create_app(repo=None, settings=None):
                 "persistence": "temporary; resets on restart" if settings.repository == "memory" else "DynamoDB",
                 "model_id": settings.model_id if settings.ai_mode == "bedrock" else "offline fixture"}
 
-    @app.post("/api/demo/candidate")
-    def candidate_login(request: Request, response: Response):
-        return start_session("candidate", request, response)
+    @app.post("/api/auth/signup", response_model=AccountSession)
+    def signup(body: SignupRequest, request: Request, response: Response):
+        auth.throttle("signup", request.client.host if request.client else "unknown", str(body.email))
+        return start_session(auth.signup(body), request, response)
 
-    @app.post("/api/demo/student")
-    def student_login(request: Request, response: Response):
-        return start_session("student", request, response)
+    @app.post("/api/auth/login", response_model=AccountSession)
+    def login(body: LoginRequest, request: Request, response: Response):
+        auth.throttle("login", request.client.host if request.client else "unknown", str(body.email))
+        return start_session(auth.login(body), request, response)
 
-    @app.post("/api/demo/employer")
-    def employer_login(request: Request, response: Response):
-        return start_session("employer", request, response)
+    @app.post("/api/auth/logout")
+    def logout(request: Request, response: Response):
+        token = request.cookies.get("skillpilot_session")
+        auth.logout(token)
+        if token:
+            sessions.pop(digest(token), None)
+        response.delete_cookie("skillpilot_session", httponly=True, samesite="strict", secure=settings.secure_cookies)
+        return {"status": "signed_out"}
 
-    @app.get("/api/session")
+    @app.get("/api/session", response_model=AccountSession)
     def session_info(session=Depends(authenticated)):
-        return {"profile": service.profile(session.uid), "mode": settings.ai_mode}
+        return {"profile": service.profile(session.uid), "email": session.email, "mode": settings.ai_mode}
 
     @app.get("/api/dashboard", response_model=DashboardRecord, response_model_exclude_none=True)
     def dashboard(session=Depends(candidate)):

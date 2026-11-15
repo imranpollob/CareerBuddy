@@ -3,5 +3,6 @@ import App from './App'
 import '@fontsource-variable/plus-jakarta-sans'
 import '@fontsource-variable/outfit'
 import './style.css'
+import './product.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<App/>)

@@ -2,17 +2,17 @@
 
 Three requested stories share one platform. A fourth demonstration moment connects them: learning and reassessment change the evidence used by the marketplace.
 
-Start from the repository root with `bash scripts/dev.sh`, then open http://127.0.0.1:5173. The top-right identity selector switches between **Software engineer demo**, **Student demo**, and **Employer demo**. These are separate server-controlled identities; changing identity does not transfer assessment history.
+Start from the repository root with `bash scripts/dev.sh`, then open http://127.0.0.1:5173. Sign in with an email and password. Initial actor credentials are in the private `.local/actor-accounts.json` file. Alex (`alex@example.com`), Priya (`priya@example.com`), and Jordan (`jordan@example.com`) are regular precreated accounts. Sign out before signing into another account; no identity switcher is exposed. New users can sign up through the same application.
 
 ## 1. Software engineer transitioning to AI engineering
 
 **Person:** Alex Morgan, Software Engineer → AI Engineer.
 
-1. Select **Software engineer demo**. Show the current role, goal, self-reported Python/SQL, and applied-AI portfolio project.
-2. Ask **“What skills are in demand?”** Expand the delegation trace to show Job Market retrieving the sample and computing skill counts.
+1. Sign in as **Alex Morgan**. Show the current role, goal, self-reported Python/SQL, and applied-AI portfolio project.
+2. Open **Ask SkillPilot** and ask **“What skills are in demand?”** Expand the delegation trace to show Job Market retrieving the sample and computing skill counts.
 3. Ask **“Build my learning roadmap.”** Coach reads Alex's own evidence and job requirements.
 4. Open a Python or RAG assessment. Submit answers through the form; show that a profile edit cannot set an assessed score.
-5. Open **Job marketplace** and compare the supported skills and gaps on **Applied AI Engineer** or **AI Backend Engineer · RAG**.
+5. Open **Find jobs** and compare the supported skills and gaps on **Applied AI Engineer** or **AI Backend Engineer · RAG**.
 
 **Message for judges:** existing engineering experience provides context, while demonstrated AI fundamentals guide the next learning steps. Claims alone never count as evidence.
 
@@ -20,10 +20,10 @@ Start from the repository root with `bash scripts/dev.sh`, then open http://127.
 
 **Person:** Priya Shah, Computer Science Student → AI Engineer.
 
-1. Select **Student demo**. Priya has her own profile, assessments, lessons, consent, and chat session.
+1. Sign in as **Priya Shah**. Priya has her own profile, assessments, lessons, consent, and chat session.
 2. Show the Python/SQL-first roadmap and the campus study-assistant portfolio project.
 3. Ask **“I am a computer science student seeking my first AI engineering role. Build my learning roadmap.”**
-4. Complete a fundamentals assessment. Visit **Job marketplace**, which defaults to **Internships + entry / graduate** for Priya.
+4. Complete a fundamentals assessment. Visit **Find jobs**, which defaults to **Internships + entry / graduate** for Priya.
 5. Compare a real sourced opportunity with the clearly labeled **AI Engineering Intern** and **Junior AI Engineer** demo roles.
 6. Opt into discovery using **Edit profile** if you want to show Priya in the employer view. Discovery starts off.
 
@@ -33,7 +33,7 @@ Start from the repository root with `bash scripts/dev.sh`, then open http://127.
 
 **Person:** Jordan Lee, demo hiring manager.
 
-1. Select **Employer demo** and choose **Junior AI Engineer**.
+1. Sign in as **Jordan Lee** and choose **Junior AI Engineer**.
 2. Compare the initial seeded profiles:
 
 | Demo profile | Background | Evidence supporting this posting | Gaps |
@@ -43,7 +43,7 @@ Start from the repository root with `bash scripts/dev.sh`, then open http://127.
 | Maya Chen | Final-year CS student | Python, SQL: 2 of 4 | LLM, RAG |
 
 3. Expand each evidence panel to show the assessment reference, date, scope, and **Seeded synthetic evidence** label.
-4. Alex or Priya appears only after passing a relevant assessment and opting in. Their newly submitted evidence is labeled **Graded during this demo**.
+4. Alex or Priya appears only after passing a relevant assessment and opting in. Their newly submitted evidence is labeled **Assessment-backed evidence**.
 5. Create an AI Engineer posting, specify career level and required skills, then compare its consenting candidates.
 
 Taylor Reed is a deliberately private synthetic profile and must never appear in employer discovery. There are no opaque hiring scores, personality inferences, or automatic hiring decisions.
@@ -67,5 +67,7 @@ Reading a lesson alone never changes assessed skills. Reassessment uses a fresh 
 - Sources and retrieval timestamps are stored with each posting. Keyword extraction tracks a small skill vocabulary and may include optional mentions; review the original source before treating it as a requirement.
 - Real postings provide context. Synthetic Northstar jobs give the presentation stable, explicit requirements, even if a public vacancy closes.
 - Run `uv run python -m scripts.aws_preflight` before presenting. A labeled mock mode is available if temporary credentials expire.
-- Existing local profile edits, consent, and assessment records are preserved on restart. Do not delete the local database to restart a presentation; use fresh assessment attempts and the identity selector.
+- Existing local profile edits, consent, and assessment records are preserved on restart. Do not delete the local database to restart a presentation; use fresh assessment attempts and sign into the desired actor account.
 
+
+The product is not limited to these presentation actors. To demonstrate a new user, choose **Create an account**, enter a new email and password, complete the onboarding details, and show the resulting private workspace. The Overview, My skills, and Learning plan tabs organize the candidate journey.

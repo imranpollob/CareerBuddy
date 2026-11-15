@@ -55,20 +55,13 @@ uv run python -m scripts.live_agents_smoke
 
 The first script verifies CLI/SDK identity, lists Nova models, and makes a tiny Converse inference call. It creates no AWS infrastructure. Reports under `.local/` contain no credential values or account IDs. The second script makes a small number of live inference calls to check actual nested delegation. These calls use Bedrock credits. Offline unit and browser tests use an explicit mock model instead.
 
-## Demo flow
+## Accounts and presentation actors
 
-The three identities are **Software engineer demo** (Alex), **Student demo** (Priya), and **Employer demo** (Jordan). The student has an independent profile and evidence, a foundations-first roadmap, a portfolio project, and an early-career job filter. See the [hackathon demo guide](docs/DEMO_GUIDE.md) for all three stories and the learning-to-matching demonstration.
+The app opens on email/password sign-in. New candidates and employers can create accounts and get their own workspace. Candidates choose their background during onboarding; discovery starts off. Assessments and private records stay attached to the signed-in account.
 
+Three actor accounts are precreated: **Alex Morgan** (`alex@example.com`), **Priya Shah** (`priya@example.com`), and **Jordan Lee** (`jordan@example.com`). Their random initial passwords are stored privately in ignored `.local/actor-accounts.json` after the first backend startup. Open that file locally; do not commit or publish it. These accounts use the same login form as everyone else. The former demo identity selector and passwordless demo endpoints have been removed.
 
-1. Start in **Software engineer demo**. Edit the name, current role, career goal, and self-reported skills. The initial AI Engineer path is already populated.
-2. Ask chat “What skills are in demand?” and expand the specialist trace. Review the sourced sample postings in **Job marketplace**.
-3. Ask “Prepare a Python assessment.” Submit the four-question form. Passing requires at least 75%; Python, SQL, LLM, RAG, PyTorch, AWS, and evaluation topics are available.
-4. If the result needs practice, open **Reliable Python foundations**, work through its exercise, and click **I’ve practiced · Start reassessment**. A fresh graded attempt updates evidence and the roadmap.
-5. Visit **Job marketplace**. Coverage reflects only passed assessments; a Python pass changes the synthetic Python Engineer role from 0/2 to 1/2 supported skills.
-6. Edit the candidate profile and opt into employer discovery. Switch the fixed demo identity to **Employer demo**. Select the Python Engineer role and inspect Alex's assessment evidence.
-7. Create a new demo job and select it to find consenting candidates. Opting out hides the candidate on subsequent discovery requests.
-
-The answer key is intentionally server-side, and the fixed fundamentals assessment is intentionally small. This is evidence of passing that specific check, not proof of professional proficiency.
+The dashboard focuses on a next step, skill summary, and learning progress. Detailed skills and milestones are in separate tabs. **Ask SkillPilot** opens the assistant when needed. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
 
 ## Tests
 
@@ -87,7 +80,7 @@ Backend tests exercise Strands routing/tool execution, deterministic scoring, pr
 
 ```text
 backend/
-  api.py                 Thin FastAPI routes and fixed demo sessions
+  api.py                 Thin FastAPI routes and account authentication and sessions
   orchestrator.py        Only user-facing agent; specialists exposed as tools
   agents/                Four specialists, model provider, workflow steering
   tools/                 Deterministic grading, skill normalization, matching
@@ -113,7 +106,7 @@ Offline mode is clearly labeled. It supplies deterministic model responses **ins
 
 The bundled sample contains 42 public postings across nine employers (including eight public early-career postings) plus six synthetic Northstar Labs roles. URLs and retrieval timestamps are retained. Seven fictional profiles cover engineer, student, employer, and consenting/private comparison candidates; seeded evidence is labeled synthetic. New employer postings are labeled synthetic. Public job skill extraction uses a fixed keyword vocabulary; it may include optional mentions, and original postings must be reviewed. Refresh with `uv run python -m scripts.import_jobs`; it preserves synthetic roles. On backend startup, missing records are added without overwriting profile edits, consent, or evidence. Removed public snapshots leave the active sample while remaining stored.
 
-The sample powers two AI-engineering journeys: a software-engineer transition and a student seeking a first role. Editing the target-role label does not build a new market dataset. Assessments, lessons, and reassessments work; open-ended exercise grading, broad job crawling, real login, and production employer verification are outside this MVP.
+The sample powers two AI-engineering journeys: a software-engineer transition and a student seeking a first role. Editing the target-role label does not build a new market dataset. Assessments, lessons, and reassessments work; open-ended exercise grading, broad job crawling, email verification/password reset, and production employer verification are outside this MVP.
 
 See [data model and API](docs/DATA_MODEL.md), [AWS/model verification](docs/AWS_SETUP.md), [validation status](docs/VALIDATION.md), and [AgentCore preparation](docs/DEPLOYMENT.md).
 

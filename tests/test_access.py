@@ -1,10 +1,10 @@
 def test_sessions_and_backend_roles(client):
     assert client.get("/api/dashboard").status_code==401
-    client.post("/api/demo/employer")
+    client.login("employer")
     assert client.get("/api/dashboard").status_code==403
     assert client.post("/api/assessments",json={"skill":"python"}).status_code==403
     assert client.get("/api/employer/jobs/greenhouse-unknown/candidates").status_code==403
-    client.post("/api/demo/candidate")
+    client.login("candidate")
     assert client.get("/api/employer/jobs").status_code==403
     assert client.post("/api/jobs",json={"title":"Engineer","company":"Demo","description":"A long job description","required_skills":["python"]}).status_code==403
 
@@ -20,7 +20,7 @@ def test_profile_update_cannot_modify_evidence_or_identity(candidate):
 def test_cross_user_assessment_and_opt_in_projection(candidate,repo):
     foreign=repo.partition("USER#seed-candidate","ASSESSMENT#")[0]
     assert candidate.get(f"/api/assessments/{foreign['id']}").status_code==400
-    candidate.post("/api/demo/employer")
+    candidate.login("employer")
     result=candidate.get("/api/employer/jobs/demo-ai-engineer/candidates").json()
     assert {c["id"] for c in result}=={"seed-candidate", "seed-student", "seed-switcher"}
     assert all(c["id"]!="seed-private" for c in result)

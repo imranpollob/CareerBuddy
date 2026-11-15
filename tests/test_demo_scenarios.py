@@ -7,7 +7,7 @@ from scripts.import_jobs import career_level
 def test_student_identity_and_profile_isolation(candidate):
     engineer = candidate.get("/api/dashboard").json()
     assert engineer["profile"]["candidate_track"]=="career_switcher"
-    candidate.post("/api/demo/student")
+    candidate.login("student")
     student = candidate.get("/api/dashboard").json()
     assert student["profile"]["id"]=="student-demo"
     assert student["profile"]["current_role"]=="Computer Science Student"
@@ -18,15 +18,15 @@ def test_student_identity_and_profile_isolation(candidate):
     attempt=candidate.post("/api/assessments",json={"skill":"python"}).json()
     candidate.post(f"/api/assessments/{attempt['id']}/submit",json={"answers":{"q1":0,"q2":2,"q3":1,"q4":3}})
     assert candidate.get("/api/dashboard").json()["skills"][0]["synthetic"] is False
-    candidate.post("/api/demo/candidate")
+    candidate.login("candidate")
     assert candidate.get(f"/api/assessments/{attempt['id']}").status_code==400
     assert candidate.get("/api/dashboard").json()["skills"]==[]
-    candidate.post("/api/demo/student")
+    candidate.login("student")
     assert candidate.get("/api/dashboard").json()["skills"][0]["assessment_id"]==attempt["id"]
 
 
 def test_student_learning_to_employer_with_consent(candidate):
-    candidate.post("/api/demo/student")
+    candidate.login("student")
     before=candidate.get("/api/matches").json()
     assert before[0]["job"]["career_level"] in {"entry","internship"}
     attempt=candidate.post("/api/lessons/python/complete").json()
@@ -37,11 +37,11 @@ def test_student_learning_to_employer_with_consent(candidate):
     profile=candidate.get("/api/dashboard").json()["profile"]
     update={k:profile[k] for k in ["name","current_role","target_role","claimed_skills","marketplace_opt_in"]}
     assert candidate.patch("/api/profile",json={**update,"candidate_track":"experienced"}).status_code==422
-    candidate.post("/api/demo/employer")
+    candidate.login("employer")
     assert all(c["id"]!="student-demo" for c in candidate.get("/api/employer/jobs/demo-junior-ai/candidates").json())
-    candidate.post("/api/demo/student")
+    candidate.login("student")
     candidate.patch("/api/profile",json={**update,"marketplace_opt_in":True})
-    candidate.post("/api/demo/employer")
+    candidate.login("employer")
     found=candidate.get("/api/employer/jobs/demo-junior-ai/candidates").json()
     student=next(c for c in found if c["id"]=="student-demo")
     assert student["candidate_track"]=="student"
@@ -79,7 +79,7 @@ def test_data_covers_students_and_engineers(repo):
 
 
 def test_employer_chat_uses_consent_filtered_preview(client):
-    client.post("/api/demo/employer")
+    client.login("employer")
     response=client.post("/api/chat",json={"message":"Find candidates for my AI engineer jobs"})
     assert response.status_code==200
     delegation=response.json()["delegations"][0]

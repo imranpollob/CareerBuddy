@@ -13,6 +13,10 @@ anyio==4.16.0
     #   sse-starlette
     #   starlette
     #   watchfiles
+argon2-cffi==25.1.0
+    # via pwdlib
+argon2-cffi-bindings==26.2.0
+    # via argon2-cffi
 attrs==26.1.0
     # via
     #   jsonschema
@@ -34,14 +38,20 @@ certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
-cffi==2.1.1 ; platform_python_implementation != 'PyPy'
-    # via cryptography
+cffi==2.1.1
+    # via
+    #   argon2-cffi-bindings
+    #   cryptography
 click==8.5.1
     # via uvicorn
 cryptography==50.0.2
     # via pyjwt
+dnspython==2.9.2
+    # via email-validator
 docstring-parser==0.18.0
     # via strands-agents
+email-validator==2.4.0
+    # via skillpilot
 fastapi==0.163.0
     # via skillpilot
 h11==0.16.0
@@ -66,6 +76,7 @@ httpx2-jsfetch==1.0 ; python_full_version >= '3.12' and sys_platform == 'emscrip
 idna==3.20
     # via
     #   anyio
+    #   email-validator
     #   httpx
     #   httpx2
 jmespath==1.1.0
@@ -103,7 +114,9 @@ opentelemetry-semantic-conventions==0.66b2
     #   opentelemetry-sdk
 packaging==26.3
     # via opentelemetry-instrumentation
-pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+pwdlib==0.4.0
+    # via skillpilot
+pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
 pydantic==2.14.3
     # via
