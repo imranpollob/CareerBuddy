@@ -15,7 +15,7 @@ Validated locally with explicit mock tests plus separate actual Bedrock/DynamoDB
 | Employer marketplace | Analyze/tag a new posting, enforce ownership, inspect only consenting candidates and relevant evidence |
 | Multi-agent system | One Strands orchestrator and four specialists exposed as tools; typed summaries and observable delegation results |
 | Live Bedrock flow | Actual adaptive interview → confirmed skills → personalized Python assessment → server grading/persisted evidence → generated FastAPI lesson → Coach delegation reading the new evidence |
-| Offline AI | Explicitly labeled fixtures; actual Strands agent/tool loops remain in use |
+| Offline AI | Explicit configuration with fixture provenance retained in records/API; actual Strands agent/tool loops remain in use |
 | Backend checks | 64 pytest tests passed; covers routing, scoring, persistence, matching, authentication, consent, generation failure and claim/tag grounding |
 | Browser checks | Six browser tests at desktop and iPhone sizes; adaptive signup plus assessment → learning → reassessment → marketplace/employer flow |
 | Frontend build | TypeScript and Vite production build passed |
@@ -43,3 +43,5 @@ CareerBuddy validation also covers career-purpose updates, saved visual paths, g
 The interface now uses a Linear-inspired dark default theme with a light alternative, locally bundled Inter/JetBrains Mono fonts, and sidebar account controls instead of a top bar. Chat and lessons render Markdown. Browser checks cover semantic headings/lists/tables, code copying, rejection of unsafe links/raw HTML/images, visible pending-generation loaders, error recovery and reduced-motion behavior. Loader messages rotate without presenting fabricated percentages.
 
 Home checks verify the default candidate landing page, no generation requests on load/reload, pending-assessment resume without regeneration, updated skill/competency snapshots after grading, featured-role detail navigation and mobile account/profile access. The existing conversation-history, Markdown, loader/error and employer flows still run at both desktop/mobile sizes.
+
+Customer-facing generation/provider badges and the chat header/footer have been removed. Sample profiles, sample postings and sample evidence remain identified so presentation polish does not misrepresent fictional records as real data. Underlying generation/model provenance is retained in persisted records and API responses.

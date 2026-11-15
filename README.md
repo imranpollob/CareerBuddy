@@ -106,7 +106,7 @@ deployment/              Prepared image recipe and pinned dependencies
 
 All model-facing tools bind the authenticated identity in Python closures. Specialists have limited tool access and return validated structured summaries plus authoritative tool data. The model never supplies assessment scores or writes arbitrary records. Deterministic steering requires data retrieval before a specialist may finalize its response. Budgets limit model-call loops. Model failures return a retryable 503; dashboard actions remain available.
 
-Offline mode is clearly labeled. It supplies deterministic model responses **inside the Strands Model interface**, so the same actual nested agents and tool loops execute. It is not evidence of live Bedrock quality.
+Offline mode is explicitly selected through configuration and reported by the API; provider and generation badges are omitted from the customer interface. It supplies deterministic model responses **inside the Strands Model interface**, so the same actual nested agents and tool loops execute. It is not evidence of live Bedrock quality.
 
 ## Data and scope
 

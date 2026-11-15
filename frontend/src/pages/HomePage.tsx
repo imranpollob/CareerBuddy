@@ -27,10 +27,10 @@ export function getNextAction(data:Dashboard,plan:LearningPlan):HomeAction{
  return {kind:'jobs',title:'Explore opportunities with your skills',description:'Review relevant roles, the requirements your evidence supports, and the gaps to work on next.',label:'Explore jobs'}
 }
 interface Props{
- data:Dashboard;plan:LearningPlan;passport:Passport;matches:Match[];mode:string;busy:boolean
+ data:Dashboard;plan:LearningPlan;passport:Passport;matches:Match[];busy:boolean
  onAction:(action:HomeAction)=>void;onLearning:()=>void;onPassport:()=>void;onJobs:()=>void;onJob:(job:Job)=>void;onChat:()=>void;onResume:(a:Assessment)=>void
 }
-export function HomePage({data,plan,passport,matches,mode,busy,onAction,onLearning,onPassport,onJobs,onJob,onChat,onResume}:Props){
+export function HomePage({data,plan,passport,matches,busy,onAction,onLearning,onPassport,onJobs,onJob,onChat,onResume}:Props){
  const action=getNextAction(data,plan)
  const passed=passport.skills.filter(s=>s.passed)
  const latest=passport.assessments.filter(a=>a.status==='completed').sort((a,b)=>(b.completed_at||b.created_at).localeCompare(a.completed_at||a.created_at))[0]
@@ -43,7 +43,7 @@ export function HomePage({data,plan,passport,matches,mode,busy,onAction,onLearni
  const early=sample.filter(m=>['entry','internship'].includes(m.job.career_level))
  const opportunities=(data.profile.candidate_track==='student'&&early.length?early:sample).slice(0,3)
  return <div className="page-stack home-page">
-  <div className="home-heading"><div><h1>Good to see you, {data.profile.name.split(' ')[0]}.</h1><p>{GOALS[data.profile.career_goal]}<span aria-hidden="true"> · </span><span>{data.profile.current_role}<ArrowRight size={13}/>{data.profile.target_role}</span></p></div><div className="home-heading-actions">{mode==='mock'&&<span className="pill">Offline preview</span>}<button className="text-button" onClick={onChat}><MessageCircle size={16}/>Ask CareerBuddy</button></div></div>
+  <div className="home-heading"><div><h1>Good to see you, {data.profile.name.split(' ')[0]}.</h1><p>{GOALS[data.profile.career_goal]}<span aria-hidden="true"> · </span><span>{data.profile.current_role}<ArrowRight size={13}/>{data.profile.target_role}</span></p></div><div className="home-heading-actions"><button className="text-button" onClick={onChat}><MessageCircle size={16}/>Ask CareerBuddy</button></div></div>
   <section className="card home-next-step" aria-labelledby="home-next-heading"><div><p className="eyebrow">YOUR NEXT STEP</p><h2 id="home-next-heading">{action.title}</h2><p className="home-next-description">{action.description}</p></div><button className="button primary" disabled={busy} onClick={()=>onAction(action)}>{action.label}<ArrowRight size={16}/></button></section>
   <div className="home-snapshots">
    <section className="card home-roadmap" aria-labelledby="home-roadmap-heading"><div className="home-card-heading"><h2 id="home-roadmap-heading"><BookOpen size={18}/>Roadmap progress</h2><button className="text-button" onClick={onLearning}>View roadmap<ArrowRight size={14}/></button></div><p className="home-progress-copy"><strong>{plan.completed_topics}</strong> of {plan.total_topics} planned competencies passed</p><progress className="home-progress" aria-label="Roadmap competency progress" value={plan.completed_topics} max={Math.max(plan.total_topics,1)}/><ol className="home-milestones">{milestones.map((s,i)=>{const done=s.topics.filter(t=>t.status==='completed').length;return <li key={s.skill} className={i===0?'is-current':''}><span className="home-milestone-dot">{done===3?<Check size={12}/>:i+1}</span><div><b>{s.label}</b><small>{done===3?'Three competencies passed':s.expanded?`${done} of 3 competencies passed`:i===0?'Current focus · three competencies to explore':'Upcoming focus'}</small></div></li>})}</ol>{milestones.length===0&&<p className="home-empty-copy">Your learning path will appear here as role requirements become available.</p>}</section>

@@ -58,3 +58,5 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   if (!response.ok) throw new ApiError(typeof data.detail === 'string' ? data.detail : 'Please check the form fields and try again.',response.status)
   return data as T
 }
+
+export function evidenceScope(scope:string){return scope.replace(/^Generated four-question /i,'Four-question ').replace(/AI-authored questions are limited evidence/gi,'These questions provide limited evidence')}
