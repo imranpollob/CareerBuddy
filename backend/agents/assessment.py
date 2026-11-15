@@ -9,7 +9,7 @@ def run(service, settings, uid, role, request):
 
     @tool
     def prepare_skill_assessment(skill: str = "python") -> dict:
-        """Prepare a four-question fundamentals assessment. Topic: python, rag, llm, pytorch, aws, evaluation or sql.
+        """Generate a personalized four-question assessment for a normalized skill identified in the profile or job sample.
 
         Args:
             skill: The normalized skill to assess. Default python.

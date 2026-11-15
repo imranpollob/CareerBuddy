@@ -57,7 +57,7 @@ The first script verifies CLI/SDK identity, lists Nova models, and makes a tiny 
 
 ## Accounts and presentation actors
 
-The app opens on email/password sign-in. New candidates and employers can create accounts and get their own workspace. Candidates choose their background during onboarding; discovery starts off. Assessments and private records stay attached to the signed-in account.
+The app opens on email/password sign-in. Signup asks only for name, email, password, and account purpose. New candidates then have a short adaptive LLM interview about their experience, projects, and career goal. They review the discovered skills before SkillPilot generates a personalized four-question assessment. Discovery starts off. Private records stay attached to the signed-in account.
 
 Three actor accounts are precreated: **Alex Morgan** (`alex@example.com`), **Priya Shah** (`priya@example.com`), and **Jordan Lee** (`jordan@example.com`). Their random initial passwords are stored privately in ignored `.local/actor-accounts.json` after the first backend startup. Open that file locally; do not commit or publish it. These accounts use the same login form as everyone else. The former demo identity selector and passwordless demo endpoints have been removed.
 
@@ -85,6 +85,8 @@ backend/
   agents/                Four specialists, model provider, workflow steering
   tools/                 Deterministic grading, skill normalization, matching
   service.py             Authorized workflow operations and derived views
+  onboarding.py          Persisted adaptive interview and skill confirmation
+  intelligence.py        Validated Strands generation for interviews/content/tags
   db.py                  Memory and single-table DynamoDB repositories
   models.py              Strict Pydantic request/output contracts
   data/jobs.json         Attributed public snapshot and labeled demo roles
@@ -104,9 +106,18 @@ Offline mode is clearly labeled. It supplies deterministic model responses **ins
 
 ## Data and scope
 
-The bundled sample contains 42 public postings across nine employers (including eight public early-career postings) plus six synthetic Northstar Labs roles. URLs and retrieval timestamps are retained. Seven fictional profiles cover engineer, student, employer, and consenting/private comparison candidates; seeded evidence is labeled synthetic. New employer postings are labeled synthetic. Public job skill extraction uses a fixed keyword vocabulary; it may include optional mentions, and original postings must be reviewed. Refresh with `uv run python -m scripts.import_jobs`; it preserves synthetic roles. On backend startup, missing records are added without overwriting profile edits, consent, or evidence. Removed public snapshots leave the active sample while remaining stored.
+The bundled sample contains **68 real postings across nine employers**, including eight internship/entry titles, plus six synthetic Northstar Labs roles. All 68 real postings have Bedrock-generated tags: **574 source-grounded tags across 106 distinct skills**. Original URLs, retrieval dates, required/preferred distinctions, supporting excerpts, and model provenance are saved directly in `backend/data/jobs.json`; counts are in `backend/data/jobs_manifest.json`. Seven fictional profiles and three regular actor accounts support presentation; seeded evidence is labeled synthetic. Employer-created postings are tagged from their descriptions as they are saved.
 
-The sample powers two AI-engineering journeys: a software-engineer transition and a student seeking a first role. Editing the target-role label does not build a new market dataset. Assessments, lessons, and reassessments work; open-ended exercise grading, broad job crawling, email verification/password reset, and production employer verification are outside this MVP.
+Refresh the public sample from free employer APIs, then tag new or changed descriptions with Bedrock:
+
+```bash
+uv run python -m scripts.import_jobs
+uv run python -m scripts.tag_jobs
+```
+
+Importing creates no AWS resources and requires no job-API key; tagging uses permitted Bedrock inference credits. Both scripts update the dataset manifest. The importer refuses to replace the snapshot with fewer than 50 real postings and preserves existing tags for unchanged descriptions. Restart the API to load the updated snapshot; profile edits, consent, and assessment evidence are preserved.
+
+The sample supports AI-engineering career transitions and first-role seekers. New users are not restricted to the actors or a fixed skill list: interviews, assessments, and lessons use their own context. Assessments are AI-authored objective checks with private server-held keys and deterministic grading; they are limited evidence, not certification. Mock mode uses explicitly labeled fixtures. Editing the target-role label does not fetch another career dataset. Open-ended exercise grading, broad job crawling, email verification/password reset, and production employer verification are outside this MVP. See [the dynamic workflow](docs/DYNAMIC_FLOW.md).
 
 See [data model and API](docs/DATA_MODEL.md), [AWS/model verification](docs/AWS_SETUP.md), [validation status](docs/VALIDATION.md), and [AgentCore preparation](docs/DEPLOYMENT.md).
 

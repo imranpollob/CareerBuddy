@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, Check, Compass, LayoutDashboard, LogOut, MessageCircle, Settings, Users, X } from 'lucide-react'
-import { api, ApiError, LABELS, type Assessment as Attempt, type Dashboard, type Match, type AccountSession, type ProfileUpdate, type Lesson, type ChatResponse } from './api'
+import { api, ApiError, LABELS, setSkillCatalog, type Assessment as Attempt, type Dashboard, type Match, type AccountSession, type ProfileUpdate, type Lesson, type ChatResponse } from './api'
 import { CandidateDashboard } from './pages/CandidateDashboard'
 import { EmployerDashboard } from './pages/EmployerDashboard'
 import { Marketplace } from './pages/Marketplace'
 import { AuthPage } from './pages/AuthPage'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { Chat } from './components/Chat'
 import { Assessment } from './components/Assessment'
 import { Modal } from './components/Modal'
@@ -27,20 +28,21 @@ export default function App(){
 
   function handleError(e:unknown){
     setError(e instanceof Error?e.message:String(e))
-    if(e instanceof ApiError&&e.status===401){setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null)}
+    if(e instanceof ApiError&&e.status===401){setSkillCatalog();setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null)}
   }
   async function refresh(){
     const [dashboard,jobMatches]=await Promise.all([api<Dashboard>('/dashboard'),api<Match[]>('/matches')])
-    setData(dashboard);setMatches(jobMatches);setAccount(a=>a?{...a,profile:dashboard.profile}:a)
+    setSkillCatalog(dashboard.skill_catalog);setData(dashboard);setMatches(jobMatches);setAccount(a=>a?{...a,profile:dashboard.profile}:a)
   }
   async function authenticated(session:AccountSession){
+    setSkillCatalog()
     setAccount(session);setLoading(true);setError('');setNotice('');setView('dashboard')
-    try{if(session.profile.role==='candidate')await refresh()}catch(e){handleError(e)}finally{setLoading(false)}
+    try{if(session.profile.role==='candidate'&&session.profile.onboarding_completed)await refresh()}catch(e){handleError(e)}finally{setLoading(false)}
   }
   useEffect(()=>{void api<AccountSession>('/session').then(authenticated).catch(e=>{if(!(e instanceof ApiError&&e.status===401))handleError(e);setLoading(false)})},[])
   async function signOut(){
     setBusy(true)
-    try{await api('/auth/logout','POST');setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null);setNotice('');setError('')}
+    try{await api('/auth/logout','POST');setSkillCatalog();setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null);setNotice('');setError('')}
     catch(e){handleError(e)}finally{setBusy(false)}
   }
   async function assess(skill:string){setBusy(true);try{setAttempt(await api<Attempt>('/assessments','POST',{skill}))}catch(e){handleError(e)}finally{setBusy(false)}}
@@ -56,6 +58,12 @@ export default function App(){
   }
   if(loading&&!account)return <div className="loading"><Compass size={32}/><p>Opening your workspace…</p></div>
   if(!account)return <>{error&&<div className="global-alert" role="alert">{error}</div>}<AuthPage onSuccess={authenticated}/></>
+  async function onboarded(profile:AccountSession['profile']){
+    if(!account)return
+    setAccount({...account,profile});setLoading(true)
+    try{await refresh();const skill=profile.claimed_skills[0]||'python';setAttempt(await api<Attempt>('/assessments','POST',{skill}))}catch(e){handleError(e)}finally{setLoading(false)}
+  }
+  if(account.profile.role==='candidate'&&!account.profile.onboarding_completed)return <OnboardingPage name={account.profile.name} onComplete={onboarded} onSignOut={()=>void signOut()}/>
   const {profile:me}=account
   const employer=me.role==='employer'
   return <div className="app-shell product-shell"><aside className="sidebar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setView('dashboard')}}><span className="brand-mark"><Compass size={24}/></span>skillpilot<span className="brand-dot">.</span></a><nav aria-label="Main navigation"><button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>{employer?<Users size={18}/>:<LayoutDashboard size={18}/>} {employer?'Hiring workspace':'Overview'}</button>{!employer&&<button className={view==='marketplace'?'active':''} onClick={()=>setView('marketplace')}><BriefcaseBusiness size={18}/>Find jobs</button>}</nav><div className="account-menu"><div className="account-identity"><span className="avatar">{me.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</span><div><b>{me.name}</b><small>{account.email}</small></div></div>{!employer&&<button className="account-action" onClick={editProfile}><Settings size={16}/>My profile</button>}<button className="account-action" disabled={busy} onClick={()=>void signOut()}><LogOut size={16}/>Sign out</button></div></aside>
@@ -67,6 +75,6 @@ export default function App(){
     <AssistantDrawer open={chatOpen} onClose={()=>setChatOpen(false)}><Chat key={me.id} role={me.role} mode={account.mode} onResult={onChat}/></AssistantDrawer>
     {attempt&&<Assessment key={attempt.id} attempt={attempt} onClose={()=>setAttempt(null)} onSaved={refresh}/>}
     {lesson&&<Modal title={lesson.title} onClose={()=>setLesson(null)}><span className="pill">Practice, then reassess</span><p className="lesson-content">{lesson.content}</p><div className="exercise"><h3>Try it yourself</h3><p>{lesson.exercise}</p><p className="muted text-sm">Practice locally or on paper. The next assessment records evidence of understanding.</p></div><button className="button primary wide" disabled={busy} onClick={()=>void completeLesson()}>I’ve practiced · Start reassessment<ArrowRight size={16}/></button></Modal>}
-    {profile&&<Modal title="My profile" onClose={()=>setProfile(null)}><form className="profile-form" onSubmit={saveProfile}><label>Name<input required maxLength={80} value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><div className="form-grid"><label>Current role<input required maxLength={120} value={profile.current_role} onChange={e=>setProfile({...profile,current_role:e.target.value})}/></label><label>Career goal<input required maxLength={120} value={profile.target_role} onChange={e=>setProfile({...profile,target_role:e.target.value})}/></label></div><fieldset><legend>Self-reported skills</legend><div className="checkboxes">{Object.entries(LABELS).map(([s,label])=><label key={s}><input type="checkbox" checked={profile.claimed_skills.includes(s)} onChange={e=>setProfile({...profile,claimed_skills:e.target.checked?[...profile.claimed_skills,s]:profile.claimed_skills.filter(x=>x!==s)})}/>{label}</label>)}</div></fieldset><label className="opt-in"><input type="checkbox" checked={profile.marketplace_opt_in} onChange={e=>setProfile({...profile,marketplace_opt_in:e.target.checked})}/><span><b>Make my profile discoverable to employers</b><small>Share your name, role, and relevant assessment evidence. You can turn this off at any time.</small></span></label><p className="muted text-sm">Assessment results are updated only through graded submissions.</p><button className="button primary wide" disabled={busy}>{busy?'Saving…':'Save profile'}</button></form></Modal>}
+    {profile&&<Modal title="My profile" onClose={()=>setProfile(null)}><form className="profile-form" onSubmit={saveProfile}><label>Name<input required maxLength={80} value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><div className="form-grid"><label>Current role<input required maxLength={120} value={profile.current_role} onChange={e=>setProfile({...profile,current_role:e.target.value})}/></label><label>Career goal<input required maxLength={120} value={profile.target_role} onChange={e=>setProfile({...profile,target_role:e.target.value})}/></label></div><fieldset><legend>Self-reported skills</legend><div className="checkboxes">{[...new Set([...profile.claimed_skills,...(data?.market.requirements.slice(0,10).map(r=>r.skill)||[])])].map(s=>{const label=LABELS[s]||s.replaceAll('_',' ');return <label key={s}><input type="checkbox" checked={profile.claimed_skills.includes(s)} onChange={e=>setProfile({...profile,claimed_skills:e.target.checked?[...profile.claimed_skills,s]:profile.claimed_skills.filter(x=>x!==s)})}/>{label}</label>})}</div></fieldset><label className="opt-in"><input type="checkbox" checked={profile.marketplace_opt_in} onChange={e=>setProfile({...profile,marketplace_opt_in:e.target.checked})}/><span><b>Make my profile discoverable to employers</b><small>Share your name, role, and relevant assessment evidence. You can turn this off at any time.</small></span></label><p className="muted text-sm">Assessment results are updated only through graded submissions.</p><button className="button primary wide" disabled={busy}>{busy?'Saving…':'Save profile'}</button></form></Modal>}
   </div>
 }

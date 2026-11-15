@@ -1,0 +1,32 @@
+{
+  "real_postings": 68,
+  "synthetic_postings": 6,
+  "employers": {
+    "Anthropic": 10,
+    "Scale AI": 10,
+    "Databricks": 10,
+    "Figma": 6,
+    "Hex": 3,
+    "Cohere": 9,
+    "Ramp": 6,
+    "Perplexity": 10,
+    "Baseten": 4
+  },
+  "career_levels": {
+    "unspecified": 50,
+    "internship": 7,
+    "senior": 10,
+    "entry": 1
+  },
+  "llm_tagged_postings": 68,
+  "source_grounded_skill_tags": 574,
+  "distinct_tagged_skills": 106,
+  "tagging_models": [
+    "us.amazon.nova-2-lite-v1:0"
+  ],
+  "latest_tagged_at": "2026-11-15T04:59:48.827168+00:00",
+  "source_apis": [
+    "Greenhouse public Job Board API",
+    "Ashby public Job Postings API"
+  ]
+}

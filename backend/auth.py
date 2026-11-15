@@ -64,7 +64,8 @@ class Auth:
         profile = Profile(id=uid, name=request.name.strip(), role=request.role,
                           current_role=request.current_role.strip(), target_role=request.target_role.strip(),
                           claimed_skills=request.claimed_skills, marketplace_opt_in=False, synthetic=False,
-                          candidate_track="employer" if request.role == "employer" else request.candidate_track)
+                          candidate_track="employer" if request.role == "employer" else request.candidate_track,
+                          onboarding_completed=request.role == "employer")
         account = {"uid": uid, "email": email, "password_hash": self.passwords.hash(request.password.get_secret_value())}
         self.repo.write([item(pk, sk, account), item(f"USER#{uid}", "PROFILE", profile.model_dump())], absent=(pk, sk))
         return account

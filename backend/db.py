@@ -17,7 +17,7 @@ class Repository(Protocol):
     def get(self, pk: str, sk: str) -> dict | None: ...
     def partition(self, pk: str, prefix: str = "") -> list[dict]: ...
     def scan(self, sk: str) -> list[dict]: ...
-    def write(self, items: list[dict], pending: tuple[str, str] | None = None, absent: tuple[str, str] | None = None) -> None: ...
+    def write(self, items: list[dict], pending: tuple[str, str] | None = None, absent: tuple[str, str] | None = None, expected_revision: tuple[str, str, int] | None = None) -> None: ...
 
 
 def item(pk: str, sk: str, data: dict) -> dict:
@@ -45,8 +45,12 @@ class MemoryRepository:
         with self.lock:
             return [deepcopy(v["data"]) for (_, s), v in sorted(self.items.items()) if s == sk]
 
-    def write(self, items, pending=None, absent=None):
+    def write(self, items, pending=None, absent=None, expected_revision=None):
         with self.lock:
+            if expected_revision:
+                pk,sk,revision=expected_revision
+                if (self.get(pk,sk) or {}).get("revision")!=revision:
+                    raise Conflict("This conversation changed. Refresh and try again.")
             if absent and absent in self.items:
                 raise Conflict("Account already exists")
             if pending and self.get(*pending).get("status") != "pending":
@@ -86,7 +90,7 @@ class DynamoRepository:
                 return result
             args["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
-    def write(self, items, pending=None, absent=None):
+    def write(self, items, pending=None, absent=None, expected_revision=None):
         # Resource client performs DynamoDB serialization, including nested data.
         writes = []
         for value in items:
@@ -97,6 +101,10 @@ class DynamoRepository:
                            ExpressionAttributeValues={":pending": "pending"})
             if absent == (value["PK"], value["SK"]):
                 put.update(ConditionExpression="attribute_not_exists(PK)")
+            if expected_revision and expected_revision[:2] == (value["PK"],value["SK"]):
+                put.update(ConditionExpression="#d.#r = :revision",
+                           ExpressionAttributeNames={"#d":"data","#r":"revision"},
+                           ExpressionAttributeValues={":revision":expected_revision[2]})
             writes.append({"Put": put})
         try:
             self.client.transact_write_items(TransactItems=writes)

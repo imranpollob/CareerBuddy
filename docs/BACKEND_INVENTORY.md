@@ -20,17 +20,22 @@ Grading and matching are deterministic Python. The Assessment specialist prepare
 
 | Data | Count | Provenance |
 | --- | --- | --- |
-| Public job postings | 42 | Nine employer boards, original URLs and retrieval dates retained |
+| Public job postings | 68 | Nine employer boards, original URLs and retrieval dates retained; all LLM-tagged |
 | Synthetic job postings | 6 | Stable presentation fixtures with explicit skill requirements |
-| Public early-career postings | 8 | Seven internship titles and one entry/graduate title; subset of the 42 |
+| Public early-career postings | 8 | Seven internship titles and one entry/graduate title; subset of the 68 |
 | Fictional profiles | 7 | Two candidate actors, one employer actor, three consenting comparison candidates, one private comparison candidate |
 | Precreated login accounts | 3 | Actor accounts only; additional users can sign up |
 | Seeded comparison assessments | 13 | Synthetic fixtures across four comparison profiles; explicitly labeled |
-| Skills / assessment topics | 7 | Python, SQL, LLM applications, RAG, PyTorch, AWS/Bedrock, AI evaluation |
-| Objective assessment questions | 28 | Four fixed questions per topic, server-held answer keys |
-| Lessons and exercises | 7 | One working learning/reassessment cycle per topic |
+| Job skill tags | 574 | Bedrock-generated required/preferred tags, each with a validated source excerpt |
+| Distinct job skills | 106 | Normalized tags in the saved real-job sample |
+| Reference assessment questions | 28 | Seven fixed topics for offline fixtures and synthetic seed evidence only |
+| Reference lessons/exercises | 7 | Offline fixtures; Bedrock generates personalized lessons in live mode |
+| Live assessments | Generated on demand | Four personalized objective questions; private keys, deterministic grading |
+| Onboarding interviews | Generated on demand | Adaptive questions and user-confirmed skill claims grounded in answers |
 
-The nine public employers are Anthropic, Scale AI, Databricks, Figma, Hex, Cohere, Ramp, Perplexity, and Baseten. This is a bounded convenience sample, not a representative market census. Skill extraction uses keyword mentions and can include optional/contextual text. Career-stage labels do not establish educational or work-authorization eligibility.
+The nine public employers are Anthropic, Scale AI, Databricks, Figma, Hex, Cohere, Ramp, Perplexity, and Baseten. Collection uses free Greenhouse and Ashby APIs. Bedrock distinguishes required/preferred skills and exact excerpts are checked against the saved description before accepting tags. This bounded sample is not a representative market census; postings can close. Career-stage labels do not establish eligibility.
+
+Structured authoring reuses the same five role definitions: the orchestrator interviews candidates, Assessment authors questions, Job Market tags postings, and Coach writes lessons. Each task creates a short-lived Strands invocation; these are not additional agent roles or extra custom tools. The **5 agent roles / 9 custom tools** count remains unchanged.
 
 These are application data and fixed learning content, not a model-training dataset. New signups, employer-created jobs, assessment attempts, roadmaps, and matches are runtime records and increase independently of the bundled counts.
 

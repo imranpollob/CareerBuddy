@@ -44,7 +44,7 @@ Start from the repository root with `bash scripts/dev.sh`, then open http://127.
 
 3. Expand each evidence panel to show the assessment reference, date, scope, and **Seeded synthetic evidence** label.
 4. Alex or Priya appears only after passing a relevant assessment and opting in. Their newly submitted evidence is labeled **Assessment-backed evidence**.
-5. Create an AI Engineer posting, specify career level and required skills, then compare its consenting candidates.
+5. Create an AI Engineer posting, specify career level and describe its requirements. Click **Analyze and save posting**; Bedrock identifies its skills automatically. Compare its consenting candidates.
 
 Taylor Reed is a deliberately private synthetic profile and must never appear in employer discovery. There are no opaque hiring scores, personality inferences, or automatic hiring decisions.
 
@@ -58,16 +58,26 @@ Use either candidate identity:
 4. Show the changed evidence and matching requirements. For example, a new Python pass adds one supported skill to the AI Engineering Intern role.
 5. Show the same evidence in the employer view after explicit opt-in.
 
-Reading a lesson alone never changes assessed skills. Reassessment uses a fresh attempt of the same small fixed bank. A failed later attempt removes the skill from current passing evidence; previous attempts stay in history.
+Reading a lesson alone never changes assessed skills. In Bedrock mode reassessment generates fresh questions using personal context and prior prompts. Offline mode uses labeled fixtures. A failed later attempt removes the skill from current passing evidence; previous attempts stay in history.
 
 ## Data and reliable presentation
 
-- The snapshot contains **42 public postings across 9 employers**, including **8 public internship/entry postings**, plus **6 synthetic demo jobs**. Public roles include AI engineering, ML, research engineering, and related AI-platform opportunities.
+- The snapshot contains **68 public postings across 9 employers**, including **8 public internship/entry postings**, plus **6 synthetic demo jobs**. Public roles include AI engineering, ML, research engineering, and related AI-platform opportunities.
 - The seven profiles are synthetic: two interactive candidates, one employer, three consenting comparison candidates, and one private comparison candidate.
-- Sources and retrieval timestamps are stored with each posting. Keyword extraction tracks a small skill vocabulary and may include optional mentions; review the original source before treating it as a requirement.
+- All 68 public postings have Bedrock-generated skills: **574 tags across 106 skills**. Expand posting details for required/preferred labels and exact source excerpts. URLs, retrieval dates, model and description hashes are saved with each posting.
 - Real postings provide context. Synthetic Northstar jobs give the presentation stable, explicit requirements, even if a public vacancy closes.
 - Run `uv run python -m scripts.aws_preflight` before presenting. A labeled mock mode is available if temporary credentials expire.
 - Existing local profile edits, consent, and assessment records are preserved on restart. Do not delete the local database to restart a presentation; use fresh assessment attempts and sign into the desired actor account.
 
 
-The product is not limited to these presentation actors. To demonstrate a new user, choose **Create an account**, enter a new email and password, complete the onboarding details, and show the resulting private workspace. The Overview, My skills, and Learning plan tabs organize the candidate journey.
+## New-user demonstration
+
+The product is not limited to presentation actors. Choose **Create an account** and enter name, email, password and account purpose. For a new candidate:
+
+1. Answer the first question in your own words, for example that you are a software engineer or CS student seeking AI engineering work.
+2. Describe a project, tools you personally used and your responsibilities. Follow-up questions adapt to those answers in Bedrock mode.
+3. Review discovered skills and expand their supporting answer excerpts. Correct anything before confirming. Claims are not assessed evidence.
+4. Confirm to generate a personalized four-question assessment. Submit it to persist server-graded evidence.
+5. Explore **My skills**, **Learning plan**, and **Find jobs**. Ask the coach for guidance and open a missing-skill lesson.
+
+Existing actors have prefilled backgrounds and skip initial onboarding. They still receive generated assessments and lessons in Bedrock mode. Check the mode badge before presenting: offline preview uses labeled fixtures.

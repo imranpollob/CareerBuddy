@@ -21,6 +21,20 @@ BOARDS = {
 }
 
 
+def write_manifest(path, jobs):
+    public=[j for j in jobs if not j["synthetic"]]
+    tags=[t for j in public for t in j.get("skill_tags",[])]
+    manifest={"real_postings":len(public),"synthetic_postings":len(jobs)-len(public),
+              "employers":dict(Counter(j["company"] for j in public)),
+              "career_levels":dict(Counter(j["career_level"] for j in public)),
+              "llm_tagged_postings":sum(j.get("tagging_method")=="llm" for j in public),
+              "source_grounded_skill_tags":len(tags),"distinct_tagged_skills":len({t["skill"] for t in tags}),
+              "tagging_models":sorted({j["tagging_model"] for j in public if j.get("tagging_model")}),
+              "latest_tagged_at":max((j["tagged_at"] for j in public if j.get("tagged_at")),default=None),
+              "source_apis":["Greenhouse public Job Board API","Ashby public Job Postings API"]}
+    path.with_name(path.stem+"_manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+
+
 def career_level(title):
     if re.search(r"\bintern(ship)?\b|co-op", title, re.I):
         return "internship"
@@ -74,7 +88,8 @@ def collect(client, board):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--board", action="append", choices=BOARDS, help="Repeat to select boards; default all")
-    parser.add_argument("--per-board", type=int, default=5, choices=range(1,11))
+    parser.add_argument("--per-board", type=int, default=10, choices=range(1,16))
+    parser.add_argument("--minimum-real",type=int,default=50)
     parser.add_argument("--output", default="backend/data/jobs.json")
     args = parser.parse_args()
     path = Path(args.output)
@@ -95,8 +110,15 @@ def main():
     if not any(not j["synthetic"] for j in jobs):
         raise RuntimeError("No public postings available; snapshot unchanged")
     jobs.extend(j for j in old if j["synthetic"])
-    jobs = list({j["id"]: j for j in jobs}.values())
+    jobs = list({j["source_url"] or j["id"]: j for j in jobs}.values())
+    if sum(not j["synthetic"] for j in jobs)<args.minimum_real:
+        raise RuntimeError("Not enough real jobs returned; existing snapshot left unchanged")
+    old_by_url={j["source_url"]:j for j in old if not j["synthetic"]}
+    from backend.intelligence import description_hash
+    jobs=[old_by_url[j["source_url"]] if j.get("source_url") in old_by_url and old_by_url[j["source_url"]].get("tagging_method")=="llm"
+          and description_hash(old_by_url[j["source_url"]])==description_hash(j) else j for j in jobs]
     path.write_text(json.dumps(jobs, indent=2) + "\n")
+    write_manifest(path,jobs)
     print(json.dumps({"total": len(jobs), "companies": len({j["company"] for j in jobs if not j["synthetic"]}),
                       "levels": dict(Counter(j["career_level"] for j in jobs)), "failed_boards": failed}))
 

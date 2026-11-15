@@ -68,7 +68,14 @@ def test_data_covers_students_and_engineers(repo):
     service=Service(repo);service.seed()
     jobs=service.jobs()
     public=[j for j in jobs if not j["synthetic"]]
-    assert len(public)>=25
+    assert len(public)>=50
+    assert len({j["source_url"] for j in public})==len(public)
+    from backend.intelligence import normalized_text, description_hash
+    for job in public:
+        assert job["tagging_method"]=="llm" and job["tagging_model"]
+        assert job["tagged_description_hash"]==description_hash(job)
+        assert job["skill_tags"]
+        assert all(normalized_text(t["evidence_excerpt"]) in normalized_text(job["description"]) for t in job["skill_tags"])
     assert len({j["company"] for j in public})>=5
     assert sum(j["career_level"] in {"entry","internship"} for j in public)>=5
     assert all(j["source_url"] and j["retrieved_at"] for j in public)

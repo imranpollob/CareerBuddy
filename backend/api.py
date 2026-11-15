@@ -17,6 +17,9 @@ from backend.orchestrator import chat
 from backend.service import Service
 from backend.auth import Auth, InvalidCredentials, TooManyAttempts, digest
 from backend.models import LoginRequest, SignupRequest, AccountSession
+from backend.models import OnboardingState, OnboardingAnswer, OnboardingConfirm
+from backend.onboarding import Onboarding
+from backend.intelligence import GenerationError
 
 ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"]
 
@@ -36,7 +39,8 @@ def create_app(repo=None, settings=None):
     if repo is None:
         repo = MemoryRepository() if settings.repository == "memory" else DynamoRepository(
             settings.table_name, settings.dynamodb_endpoint if settings.repository == "dynamodb-local" else None)
-    service = Service(repo)
+    service = Service(repo,settings)
+    onboarding = Onboarding(service)
     auth = Auth(service, settings)
     sessions = {}
 
@@ -80,6 +84,10 @@ def create_app(repo=None, settings=None):
     @app.exception_handler(TooManyAttempts)
     async def throttled(request, exc):
         return JSONResponse(status_code=429, content={"detail": str(exc)}, headers={"Retry-After": "300"})
+
+    @app.exception_handler(GenerationError)
+    async def generation_failed(request,exc):
+        return JSONResponse(status_code=503,content={"detail":str(exc)})
 
     async def storage_error(request, exc):
         logging.getLogger(__name__).warning("Storage unavailable: %s", type(exc).__name__)
@@ -151,6 +159,18 @@ def create_app(repo=None, settings=None):
     @app.get("/api/dashboard", response_model=DashboardRecord, response_model_exclude_none=True)
     def dashboard(session=Depends(candidate)):
         return service.dashboard(session.uid)
+
+    @app.get("/api/onboarding",response_model=OnboardingState)
+    def onboarding_state(session=Depends(candidate)):
+        return onboarding.get(session.uid)
+
+    @app.post("/api/onboarding/answer",response_model=OnboardingState)
+    def onboarding_answer(body:OnboardingAnswer,session=Depends(candidate)):
+        return onboarding.answer(session.uid,body.answer,body.revision)
+
+    @app.post("/api/onboarding/complete",response_model=Profile)
+    def onboarding_complete(body:OnboardingConfirm,session=Depends(candidate)):
+        return onboarding.complete(session.uid,body.revision)
 
     @app.patch("/api/profile", response_model=Profile)
     def update_profile(body: ProfileUpdate, session=Depends(candidate)):

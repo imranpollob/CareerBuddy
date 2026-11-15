@@ -4,6 +4,7 @@ from moto import mock_aws
 import pytest
 from backend.db import MemoryRepository, DynamoRepository, Conflict
 from backend.service import Service
+from backend.db import item
 
 
 @pytest.fixture(params=["memory","dynamo"])
@@ -60,3 +61,13 @@ def test_account_and_session_persist_across_auth_instances(repository):
     from backend.auth import InvalidCredentials
     with pytest.raises(InvalidCredentials):
         auth.session(token)
+
+
+def test_interview_revision_atomically_guards_profile_updates(repository):
+    pk="USER#revision-test"
+    repository.write([item(pk,"ONBOARDING#active",{"revision":0}),item(pk,"PROFILE",{"name":"Original"})])
+    repository.write([item(pk,"ONBOARDING#active",{"revision":1}),item(pk,"PROFILE",{"name":"Confirmed"})],expected_revision=(pk,"ONBOARDING#active",0))
+    with pytest.raises(Conflict):
+        repository.write([item(pk,"ONBOARDING#active",{"revision":2}),item(pk,"PROFILE",{"name":"Stale overwrite"})],expected_revision=(pk,"ONBOARDING#active",0))
+    assert repository.get(pk,"PROFILE")["name"]=="Confirmed"
+    assert repository.get(pk,"ONBOARDING#active")["revision"]==1
