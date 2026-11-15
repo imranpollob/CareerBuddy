@@ -72,11 +72,15 @@ def test_new_account_reads_stay_empty_and_creation_is_private(client,repo,monkey
     def unavailable(*args):raise GenerationError('Unavailable')
     ai=client.app.state.service.intelligence
     original=ai.skill_path
+    from tests.test_learning_evaluation import review
+    assert client.post('/api/learning').status_code==409
+    assert client.post('/api/learning/python/expand').status_code==409
+    state=review(client)
     monkeypatch.setattr(ai,'skill_path',unavailable)
-    assert client.post('/api/learning').status_code==503
+    assert client.post('/api/learning/evaluation/complete',json={'revision':state['revision']}).status_code==503
     assert client.get('/api/learning').json()['skills']==[]
     monkeypatch.setattr(ai,'skill_path',original)
-    assert client.post('/api/learning').json()['total_topics']==3
+    assert client.post('/api/learning/evaluation/complete',json={'revision':state['revision']}).json()['total_topics']==3
     client.login('student')
     assert client.get('/api/learning').json()['skills']==[]
     assert client.get('/api/passport').json()['assessments']==[]

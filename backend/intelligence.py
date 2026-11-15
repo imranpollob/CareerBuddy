@@ -6,7 +6,7 @@ import re
 
 from strands import Agent
 from backend.agents.runtime import model, CallBudget
-from backend.models import OnboardingTurn, GeneratedAssessment, GeneratedLesson, TaggedPostings, GeneratedSkillPath
+from backend.models import OnboardingTurn, GeneratedAssessment, GeneratedLesson, TaggedPostings, GeneratedSkillPath, GeneratedRoadmap
 from backend.tools.jobs import SKILLS, extract_skills, normalize_skills, skill_label
 
 
@@ -65,7 +65,8 @@ class Intelligence:
                                   claims=claims, ready_to_review=len(answers)>=2,
                                   career_goal="stay_relevant" if "stay relevant" in combined.lower() else "find_job" if student or "find a job" in combined.lower() else "switch_careers")
         return self.generate("orchestrator", OnboardingTurn,
-            "Conduct a career onboarding interview. Ask ONE specific, useful follow-up question based on prior answers. "
+            "Conduct a three-question learning profile evaluation. Ask ONE specific question at a time, adapting to prior answers and profile background. "
+            "Prioritize the target role and goal, skills personally used in projects, and learning priorities within these three answers. "
             "Discover career purpose (stay_relevant in current role, find_job, or switch_careers), current role/studies, target role, projects, tools, and what the user personally did. "
             "Extract only positively claimed skills, never desired or explicitly missing skills. Include an EXACT excerpt from a USER answer supporting each skill. "
             "Use consistent lowercase snake_case skill IDs; canonical examples: python, sql, llm, rag, aws, evaluation, machine_learning, pytorch. "
@@ -129,6 +130,18 @@ class Intelligence:
         if normalize_skills([result.skill])[0]!=skill:
             raise GenerationError("The generated learning path did not match the requested skill. Please retry.")
         return result
+
+    def roadmap(self,profile,messages,requirements,evidence):
+        if self.settings.ai_mode=='mock':
+            preferred=extract_skills(' '.join(m['content'] for m in messages if m['role']=='user'))
+            ordered=sorted(requirements,key=lambda r:(r['skill'] not in preferred,-r['job_count']))
+            return GeneratedRoadmap(focus_skills=[r['skill'] for r in ordered[:6]],summary='A starting path based on your interview, goal and observed role requirements.')
+        return self.generate('coach',GeneratedRoadmap,
+            'Choose one to six ordered focus_skills using ONLY supplied market requirement IDs. '
+            'Personalize the order to the interview, current skills, learning gaps, target role and background. '
+            'Distinguish skills the user has from skills they want to learn. Use assessment evidence when available. '
+            'Explain the starting level and priorities in summary. Do not invent assessed skills or scores.',
+            {'profile':profile,'interview':messages,'market_requirements':requirements,'assessment_evidence':evidence})
 
     def tag_jobs(self, jobs):
         if self.settings.ai_mode == "mock":

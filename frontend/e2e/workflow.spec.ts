@@ -6,6 +6,17 @@ async function nav(page:Page,name:string){if(name==='My Profile'){await page.get
 async function logout(page:Page){await page.getByRole('button',{name:'Sign out',exact:true}).filter({visible:true}).click();await expect(page.getByRole('heading',{name:'Sign in to CareerBuddy'})).toBeVisible()}
 async function grade(page:Page,answers:number[]){const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();for(const [i,choice] of answers.entries())await dialog.locator('fieldset').nth(i).getByRole('radio').nth(choice).check();await dialog.getByRole('button',{name:'Submit assessment'}).click();await expect(dialog.getByRole('button',{name:'Back to my workspace'})).toBeVisible()}
 
+async function evaluateProfile(page:Page,student=true){
+ const dialog=page.getByRole('dialog',{name:'Profile evaluation',exact:true})
+ for(const [i,answer] of [student?'I am a student using Python and SQL. I want an AI Engineer job.':'I am a software engineer using Python and SQL. I want an AI Engineer job.','I built a Python FastAPI service and queried data with SQL.','I owned the API and tests and want to learn LLM applications.'].entries()){
+  await expect(dialog.getByText(`${i+1} of 3`,{exact:true})).toBeVisible()
+  await dialog.getByRole('textbox').fill(answer)
+  await dialog.getByRole('button',{name:'Continue',exact:true}).click()
+ }
+ await dialog.getByRole('button',{name:'Generate my roadmap',exact:true}).click()
+ await expect(dialog).toHaveCount(0)
+}
+
 test('chat, competency roadmap, passport, jobs and consenting employer evidence',async({page},testInfo)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
  const generationRequests:string[]=[];page.on('request',request=>{if(/\/api\/(chat$|assessments|competencies|learning\/[^/]+\/expand)/.test(request.url()))generationRequests.push(request.url())})
@@ -24,7 +35,7 @@ test('chat, competency roadmap, passport, jobs and consenting employer evidence'
  await expect(page.getByRole('region',{name:'CareerBuddy chat'}).getByText('Evaluate my profile',{exact:true}).last()).toBeVisible()
  await page.screenshot({path:`../.local/careerbuddy-chat-${testInfo.project.name}.png`,fullPage:true})
  await nav(page,'Learning')
- if(await page.getByRole('button',{name:'Create my roadmap',exact:true}).count())await page.getByRole('button',{name:'Create my roadmap',exact:true}).click()
+ if(await page.getByRole('button',{name:'Evaluate my profile',exact:true}).count()){await page.getByRole('button',{name:'Evaluate my profile',exact:true}).click();await evaluateProfile(page,false)}
  const python=page.locator('.path-card').filter({has:page.getByRole('heading',{name:'Python',exact:true})})
  if(await python.getByRole('button',{name:'Build competency path'}).count())await python.getByRole('button',{name:'Build competency path'}).click()
  await expect(python.locator('.topic-node')).toHaveCount(3)
@@ -104,12 +115,18 @@ test('simple signup, adaptive onboarding and a private Home snapshot',async({pag
  await expect(page.getByRole('heading',{name:'Welcome, Jamie.',exact:true})).toBeVisible()
  await expect(page.locator('.path-card,.home-job')).toHaveCount(0)
  await expect(page.getByRole('dialog')).toHaveCount(0)
+ // Simulate an old automatically generated pending Python attempt owned by this account.
+ await page.request.post('/api/assessments',{data:{skill:'python'}})
+ await page.reload()
+ await expect(page.getByRole('button',{name:'Evaluate my profile',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Finish your Python assessment',exact:true})).toHaveCount(0)
  const extraGenerationRequests:string[]=[];page.on('request',request=>{if(/\/api\/(chat$|assessments|competencies|learning$|learning\/[^/]+\/expand)/.test(request.url())&&request.method()==='POST')extraGenerationRequests.push(request.url())})
  await page.reload();await expect(page.getByRole('heading',{name:'Welcome, Jamie.',exact:true})).toBeVisible()
  expect(extraGenerationRequests).toEqual([])
  await nav(page,'Learning')
  await expect(page.getByRole('heading',{name:'Your learning starts here.',exact:true})).toBeVisible()
- await page.getByRole('button',{name:'Create my roadmap',exact:true}).click()
+ await page.getByRole('button',{name:'Evaluate my profile',exact:true}).click()
+ await evaluateProfile(page)
  await expect(page.locator('.path-card').first().locator('.topic-node')).toHaveCount(3)
  await nav(page,'Home')
  await page.getByRole('button',{name:'Start lesson',exact:true}).click()
@@ -125,6 +142,12 @@ test('simple signup, adaptive onboarding and a private Home snapshot',async({pag
  await page.getByRole('button',{name:'Close dialog'}).click()
  await expect(page.getByRole('button',{name:'Continue lesson',exact:true})).toBeVisible()
  await page.screenshot({path:`../.local/careerbuddy-home-student-${testInfo.project.name}.png`,fullPage:true})
+ await nav(page,'Learning')
+ await page.getByRole('button',{name:'Re-evaluate profile',exact:true}).click()
+ await evaluateProfile(page)
+ await expect(page.getByText('0 of 3 planned competencies completed.',{exact:false})).toBeVisible()
+ await nav(page,'Assessments')
+ await expect(page.getByText('No assessment attempts yet.',{exact:true})).toHaveCount(0)
  await nav(page,'Jobs');await expect(page.getByLabel('Career stage',{exact:true})).toHaveValue('early')
  await nav(page,'My Profile');await expect(page.getByRole('checkbox',{name:'Make my profile discoverable to employers'})).not.toBeChecked()
  await expect(page.getByLabel('Career goal',{exact:true})).toHaveValue('find_job')

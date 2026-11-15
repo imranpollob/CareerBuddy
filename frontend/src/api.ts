@@ -15,6 +15,7 @@ export type ProfileUpdate = Pick<Profile, 'name' | 'current_role' | 'target_role
 export interface Evidence { skill: string; assessment_id: string; score: number; passed: boolean; assessed_at: string; scope: string; synthetic: boolean;mastery?:string;competency_ids?:string[];assessment_ids?:string[] }
 export interface Question { id: string; prompt: string; choices: string[];format?:'knowledge'|'scenario' }
 export interface Assessment {
+  evaluation_id?:string|null;
   id: string; skill: string; status: 'pending' | 'completed'; created_at: string; questions: Question[]
   result?: {score: number; passed: boolean; scope: string; feedback: {question_id: string; correct: boolean; explanation: string}[]}
   kind: string; generation_model?: string; personalized_context?: string
@@ -39,7 +40,7 @@ export interface Health { ai_mode: 'mock' | 'bedrock'; repository: string; model
 export interface ChatResponse { message: string; mode: 'mock' | 'bedrock'; delegations: {specialist: string; tools: string[]; result: {summary: string; data: Record<string, unknown>}}[] }
 export interface OnboardingState {question_number:number;total_questions:number;options:string[];answers:Record<string,string|number>;revision:number;status:'interview'|'review'|'completed';mode:'mock'|'bedrock';question:string;messages:{role:'assistant'|'user';content:string}[];claims:{skill:string;label:string;evidence_excerpt:string}[];current_role:string;target_role:string;candidate_track:CandidateTrack;career_goal:CareerGoal}
 export interface Topic {id:string;skill:string;title:string;objective:string;format:'knowledge'|'scenario';status:'available'|'current'|'completed'|'practice_needed';lesson_completed:boolean;evidence:(Evidence&{id:string;title:string})|null}
-export interface LearningPlan {target_role:string;career_goal:CareerGoal;skills:{skill:string;label:string;job_count:number;rationale:string;expanded:boolean;topics:Topic[];mastery:string}[];next_topic:Topic|null;activity:{kind:'lesson'|'assessment';competency_id?:string;assessment_id?:string;skill:string;title:string}|null;completed_topics:number;total_topics:number;note:string}
+export interface LearningPlan {evaluation_id?:string|null;summary?:string|null;target_role:string;career_goal:CareerGoal;skills:{skill:string;label:string;job_count:number;rationale:string;expanded:boolean;topics:Topic[];mastery:string}[];next_topic:Topic|null;activity:{kind:'lesson'|'assessment';competency_id?:string;assessment_id?:string;skill:string;title:string}|null;completed_topics:number;total_topics:number;note:string}
 export interface Passport {skills:Evidence[];competencies:(Evidence&{id:string;title:string})[];assessments:Assessment[];strengths:string[];next_steps:string[];note:string}
 export interface Conversation {revision:number;messages:{role:'user'|'assistant';text:string;created_at:string;specialists:string[]}[]}
 
@@ -71,3 +72,5 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
 }
 
 export function evidenceScope(scope:string){return scope.replace(/^Generated four-question /i,'Four-question ').replace(/AI-authored questions are limited evidence/gi,'These questions provide limited evidence')}
+
+export interface LearningEvaluation extends OnboardingState {id:string}

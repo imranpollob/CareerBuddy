@@ -33,7 +33,7 @@ class Service:
             for tag in job.get("skill_tags",[]):
                 result.setdefault(tag["skill"],tag["label"])
         if uid:
-            interview=self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
+            interview=self.repo.get(f"USER#{uid}","LEARNING_EVALUATION#active") or self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
             for claim in interview.get("claims",[]):
                 result.setdefault(claim["skill"],claim["label"])
         return result
@@ -98,13 +98,13 @@ class Service:
             raise ValueError("Assessment skill does not match the competency")
         # Reuse an unsubmitted attempt, including if an agent retries a tool call.
         for existing in self.repo.partition(f"USER#{uid}", "ASSESSMENT#"):
-            if existing["skill"] == skill and existing.get("competency_id")==competency_id and existing["status"] == "pending":
+            if existing["skill"] == skill and existing.get("competency_id")==competency_id and existing["status"] == "pending" and existing.get("evaluation_id")== (self.repo.get(f"USER#{uid}","CAREER_PATH#active") or {}).get("evaluation_id"):
                 return existing
         aid=uuid4().hex
-        data={"id":aid,"skill":skill,"status":"pending","created_at":now()}
+        data={"id":aid,"skill":skill,"status":"pending","created_at":now(),"evaluation_id":(self.repo.get(f"USER#{uid}","CAREER_PATH#active") or {}).get("evaluation_id")}
         writes=[]
         if self.intelligence and not fixed:
-            interview=self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
+            interview=self.repo.get(f"USER#{uid}","LEARNING_EVALUATION#active") or self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
             prior=[q["prompt"] for a in self.repo.partition(f"USER#{uid}","ASSESSMENT#") if a["skill"]==skill for q in a["questions"]][-12:]
             context={"claimed_skill_evidence":interview.get("claims",[]),"prior_question_prompts":prior,
                      "latest_assessed_skills":self.skills(uid),"market_requirements":self.market(uid)["requirements"][:5]}
@@ -160,6 +160,8 @@ class Service:
             topic={**evidence,"id":cid,"title":data["competency_title"],"assessment_format":"objective_knowledge_check"}
             writes.append(item(pk,f"COMPETENCY#{cid}",topic))
             path=self.repo.get(pk,f"PATH#{data['skill']}")
+            if not path or cid not in {c['id'] for c in path['competencies']}:
+                raise Conflict('This assessment belongs to an earlier roadmap. Start a check from your current learning path.')
             revision_guard=(pk,f"PATH#{data['skill']}",path["revision"])
             writes.append(item(pk,f"PATH#{data['skill']}",{**path,"revision":path["revision"]+1}))
             topic_evidence=[topic if c["id"]==cid else self.repo.get(pk,f"COMPETENCY#{c['id']}") for c in path["competencies"]]

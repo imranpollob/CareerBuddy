@@ -1,0 +1,14 @@
+import {useEffect,useState} from 'react'
+import {ArrowRight} from 'lucide-react'
+import {api,GOALS,type LearningEvaluation as Evaluation,type LearningPlan} from '../api'
+import {Modal} from './Modal'
+import {GenerationLoader} from './GenerationLoader'
+
+export function LearningEvaluation({onClose,onSaved}:{onClose:()=>void;onSaved:(plan:LearningPlan)=>Promise<void>}){
+ const [state,setState]=useState<Evaluation|null>(null),[answer,setAnswer]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
+ async function begin(){setBusy(true);setError('');try{setState(await api<Evaluation>('/learning/evaluation','POST'))}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ useEffect(()=>{void begin()},[])
+ async function send(e:React.FormEvent){e.preventDefault();if(!state)return;setBusy(true);setError('');try{setState(await api<Evaluation>('/learning/evaluation/answer','POST',{revision:state.revision,answer}));setAnswer('')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function complete(){if(!state)return;setBusy(true);setError('');try{await onSaved(await api<LearningPlan>('/learning/evaluation/complete','POST',{revision:state.revision}))}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ return <Modal title="Profile evaluation" onClose={onClose}><p className="muted">A short conversation about your skills and goals. Your existing assessment history stays saved.</p>{state?.status==='interview'&&<form className="interview-answer" onSubmit={send}><p className="eyebrow">{state.question_number} of {state.total_questions}</p><h3><label htmlFor="evaluation-answer">{state.question}</label></h3><textarea id="evaluation-answer" required maxLength={3000} value={answer} onChange={e=>setAnswer(e.target.value)} disabled={busy} placeholder="Describe what you know, what you’ve built, and what you want to learn…"/><button className="button primary" disabled={busy||!answer.trim()}>Continue<ArrowRight size={16}/></button></form>}{state?.status==='review'&&<div className="skill-review"><h3>Your starting point</h3><p>{state.current_role} → {state.target_role}</p><p>{GOALS[state.career_goal]}</p><h3>Self-reported skills</h3>{state.claims.length?<ul>{state.claims.map(c=><li key={c.skill}>{c.label}<small className="muted"> — {c.evidence_excerpt}</small></li>)}</ul>:<p>No prior technical skills claimed. We’ll start from fundamentals.</p>}<p className="muted">These answers guide the roadmap. Assessments provide separate evidence.</p><button className="button primary" disabled={busy} onClick={()=>void complete()}>Generate my roadmap<ArrowRight size={16}/></button></div>}{busy&&<GenerationLoader task={state?.status==='review'?'roadmap':'onboarding'} compact/>}{error&&<p className="error" role="alert">{error}{!state&&<button className="text-button" onClick={()=>void begin()}>Retry</button>}</p>}</Modal>
+}

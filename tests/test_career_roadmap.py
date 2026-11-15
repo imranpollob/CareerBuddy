@@ -1,5 +1,12 @@
 from backend.db import item
 from backend.models import ChatResponse
+from tests.test_learning_evaluation import review
+
+def create_plan(client):
+    state=review(client)
+    response=client.post("/api/learning/evaluation/complete",json={"revision":state["revision"]})
+    assert response.status_code==200,response.text
+    return response.json()
 
 
 def pass_attempt(client,repo,uid,attempt,*,fail=False):
@@ -11,7 +18,7 @@ def pass_attempt(client,repo,uid,attempt,*,fail=False):
 
 
 def test_competency_progress_only_supports_skill_after_full_path(candidate,repo):
-    plan=candidate.post('/api/learning').json()
+    plan=create_plan(candidate)
     skill=plan['skills'][0]['skill']
     expanded=candidate.post(f'/api/learning/{skill}/expand').json()
     path=next(s for s in expanded['skills'] if s['skill']==skill)
@@ -39,7 +46,7 @@ def test_competency_progress_only_supports_skill_after_full_path(candidate,repo)
 
 
 def test_learning_content_is_private_cached_and_goal_scoped(candidate,repo,monkeypatch):
-    plan=candidate.post('/api/learning').json();skill=plan['skills'][0]['skill']
+    plan=create_plan(candidate);skill=plan['skills'][0]['skill']
     candidate.post(f'/api/learning/{skill}/expand')
     def should_not_generate(*args):
         raise AssertionError('Cached path must be reused')
@@ -69,6 +76,7 @@ def test_career_purpose_updates_roadmap_without_falsifying_evidence(candidate):
 
 
 def test_next_assessment_is_a_saved_roadmap_competency(candidate):
+    create_plan(candidate)
     result=candidate.post('/api/assessments/next')
     assert result.status_code==200,result.text
     attempt=result.json()

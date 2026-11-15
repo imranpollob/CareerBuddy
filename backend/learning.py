@@ -23,10 +23,10 @@ class Learning:
             return LearningRecord(target_role=profile['target_role'],career_goal=profile['career_goal'],
                                   skills=[],next_topic=None,activity=None,completed_topics=0,total_topics=0,
                                   note='Create your learning roadmap when you are ready.').model_dump()
-        if not saved or saved["goal"]!=goal:
+        if not saved or (saved["goal"]!=goal and not saved.get("evaluation_id")):
             saved={"goal":goal,"focus_skills":[r["skill"] for r in market[:6]]}
             if not preview:self.repo.write([item(pk,"CAREER_PATH#active",saved)])
-        else:
+        elif not saved.get('evaluation_id'):
             # Preserve paths the user opened while letting new demand refresh
             # the remaining focus slots. Evidence/history always stays intact.
             started=[s for s in saved["focus_skills"] if self.repo.get(pk,f"PATH#{s}")]
@@ -40,6 +40,7 @@ class Learning:
         next_topic=None
         for skill in saved["focus_skills"]:
             path=self.repo.get(pk,f"PATH#{skill}")
+            if saved.get('evaluation_id') and (path or {}).get('evaluation_id')!=saved['evaluation_id']:path=None
             topics=[]
             for c in (path or {}).get("competencies",[]):
                 result=self.repo.get(pk,f"COMPETENCY#{c['id']}")
@@ -54,8 +55,8 @@ class Learning:
                            "rationale":path["rationale"] if path else "Explore focused competencies connected to this career goal.",
                            "expanded":path is not None,"topics":topics,
                            "mastery":"foundational" if evidence.get(skill,{}).get("passed") else "not_assessed"})
-        return LearningRecord(target_role=profile["target_role"],career_goal=profile["career_goal"],skills=skills,next_topic=next_topic,
-                              activity=self.repo.get(pk,"ACTIVITY#active"),completed_topics=sum(t["status"]=="completed" for s in skills for t in s["topics"]),
+        return LearningRecord(evaluation_id=saved.get("evaluation_id"),summary=saved.get("summary"),target_role=saved["goal"]["target_role"],career_goal=saved["goal"]["career_goal"],skills=skills,next_topic=next_topic,
+                              activity=(self.repo.get(pk,"ACTIVITY#active") or None),completed_topics=sum(t["status"]=="completed" for s in skills for t in s["topics"]),
                               total_topics=sum(len(s["topics"]) for s in skills),
                               note="Knowledge and scenario checks support foundational evidence. Applied and demonstrated levels require practical evidence and are not awarded by quizzes.").model_dump()
 
@@ -65,14 +66,16 @@ class Learning:
         if skill not in {s["skill"] for s in plan["skills"]}:
             raise ValueError("Choose a skill in your career roadmap")
         pk,sk=f"USER#{uid}",f"PATH#{skill}"
-        if not self.repo.get(pk,sk):
+        saved=self.repo.get(pk,'CAREER_PATH#active') or {}
+        existing=self.repo.get(pk,sk)
+        if not existing or existing.get('evaluation_id')!=saved.get('evaluation_id'):
             generated=self.service.intelligence.skill_path(self.service.profile(uid),skill,self.service.market(uid)["requirements"][:8])
-            data={"skill":skill,"revision":0,"rationale":generated.rationale,"competencies":[
-                {**c.model_dump(),"id":f"{skill}:{i+1}","skill":skill} for i,c in enumerate(generated.competencies)]}
+            data={"skill":skill,"evaluation_id":saved.get("evaluation_id"),"revision":0,"rationale":generated.rationale,"competencies":[
+                {**c.model_dump(),"id":f"{skill}:{saved['evaluation_id']}-{i+1}" if saved.get("evaluation_id") else f"{skill}:{i+1}","skill":skill} for i,c in enumerate(generated.competencies)]}
             try:
                 self.repo.write([item(pk,sk,data),item(pk,'CAREER_PATH#active',{
-                    'requested':True,'goal':{k:self.service.profile(uid)[k] for k in ['current_role','target_role','career_goal']},
-                    'focus_skills':[s['skill'] for s in plan['skills']]})],absent=(pk,sk))
+                    **saved,'requested':True,'goal':{k:self.service.profile(uid)[k] for k in ['current_role','target_role','career_goal']},
+                    'focus_skills':[s['skill'] for s in plan['skills']]})],**({} if existing else {"absent":(pk,sk)}))
             except Conflict:
                 pass
         return self.plan(uid)

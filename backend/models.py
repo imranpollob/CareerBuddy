@@ -164,6 +164,7 @@ class AssessmentResult(Contract):
 
 
 class AssessmentRecord(Contract):
+    evaluation_id: str | None = None
     id: str
     skill: str
     status: Literal["pending", "completed"]
@@ -427,6 +428,8 @@ class LearningSkill(Contract):
 
 
 class LearningRecord(Contract):
+    evaluation_id: str | None = None
+    summary: str | None = None
     target_role: str
     career_goal: str
     skills: list[LearningSkill]
@@ -444,3 +447,12 @@ class PassportRecord(Contract):
     strengths: list[str]
     next_steps: list[str]
     note: str
+
+
+class LearningEvaluation(OnboardingState):
+    id: str
+
+
+class GeneratedRoadmap(Contract):
+    focus_skills: list[str] = Field(min_length=1, max_length=6)
+    summary: str = Field(min_length=10, max_length=1000)

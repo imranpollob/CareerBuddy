@@ -1,8 +1,8 @@
-# Demo data provenance
+# Job data and fixture provenance
 
 Individual UTC retrieval timestamps and original posting URLs are in `jobs.json`; current counts are in `jobs_manifest.json`.
 
-The active snapshot has **68 real public postings** from nine employer boards and six explicitly synthetic Northstar Labs jobs. All 68 real postings are LLM-tagged with 574 source-grounded tags across 106 skills. Eight public postings have internship or entry/graduate title labels. Jobs cover AI/ML engineering and related platform or research work. Career level is taken from explicit title words; `unspecified` means the title does not establish a level. No education or work-authorization eligibility is inferred.
+The active snapshot has **68 real public postings** from nine employer boards. Six synthetic Northstar Labs jobs are bundled as opt-in test fixtures and excluded from normal startup. All 68 real postings are LLM-tagged with 574 source-grounded tags across 106 skills. Eight public postings have internship or entry/graduate title labels. Jobs cover AI/ML engineering and related platform or research work. Career level is taken from explicit title words; `unspecified` means the title does not establish a level. No education or work-authorization eligibility is inferred.
 
 Public sources:
 
@@ -22,6 +22,6 @@ Refresh with `uv run python -m scripts.import_jobs`, then `uv run python -m scri
 
 `skill_tags` on real records contains normalized IDs, display labels, required/preferred classifications and exact excerpts checked against the saved description. `tagging_model`, `tagged_at` and `tagged_description_hash` record provenance. `required_skills` uses required tags; if all tags are preferred, it uses that tracked set while preserving the preferred labels. Counts and matching are deterministic over this set. Source text is capped at 12,000 characters; follow the original URL for full requirements. The six synthetic fixtures retain explicit requirements; newly created employer postings are analyzed dynamically.
 
-`demo_profiles.json` contains seven fictional identities. The comparison profiles' `seed_scores` are synthetic fixtures graded through the same deterministic code and labeled as seeded evidence. The interactive software engineer and student start with no seed scores. Actual form submissions replace current skill evidence with a server-graded record marked non-synthetic. Nothing here is a scraped real-person resume.
+`demo_profiles.json` contains seven fictional identities used only when sample seeding is explicitly enabled in isolated tests. The comparison profiles' `seed_scores` are synthetic fixtures graded through the same deterministic code and labeled as seeded evidence. The interactive software engineer and student start with no seed scores. Actual form submissions replace current skill evidence with a server-graded record marked non-synthetic. Nothing here is a scraped real-person resume.
 
-Seeding fills missing profiles, fixtures and jobs while preserving edits, consent and assessed records. Startup imports new snapshot IDs and refreshed LLM-tagged public records. Removed public snapshots remain stored for history but leave the active sample. Employer-owned postings are preserved.
+Normal seeding loads public jobs without creating fictional profiles, accounts or evidence. Opt-in test seeding fills missing fixtures while preserving existing edits and assessed records. Startup imports new snapshot IDs and refreshed LLM-tagged public records. Removed public snapshots remain stored for history but leave the active sample. Employer-owned postings are preserved.

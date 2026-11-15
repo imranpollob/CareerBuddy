@@ -1,59 +1,85 @@
-# SkillPilot data and API contracts
+# Data model and API reference
 
-One table, `SkillPilot`, with string keys `PK` and `SK`. Every item has a `data` map. Records are limited to 350 KB in the application, below DynamoDB's item limit. No indexes are required for the small demo.
+Current implementation: [backend/models.py](../backend/models.py), [backend/db.py](../backend/db.py), [backend/api.py](../backend/api.py), and [typed frontend contracts](../frontend/src/api.ts). The [README](../README.md) describes product behavior and architecture. Interactive OpenAPI documentation is available at http://127.0.0.1:8000/docs while the backend runs.
 
-| Logical entity | PK | SK | Access pattern |
+## Single-table keys
+
+One table, `SkillPilot`, uses string `PK` and `SK` keys and a `data` map per item. The application limits records to 350 KB. No secondary indexes are required for this small dataset; job/profile scans are bounded MVP access patterns.
+
+| Record | PK | SK | Access pattern |
 | --- | --- | --- | --- |
-| User | `USER#<id>` | `PROFILE` | Get authenticated profile; scan profiles for consent-filtered employer discovery |
-| UserSkill | `USER#<id>` | `SKILL#<skill>` | Query latest assessment-backed evidence for that user |
-| Assessment | `USER#<id>` | `ASSESSMENT#<attempt-id>` | Get owned attempt; query attempt history |
-| Private answer key | `USER#<id>` | `ASSESSMENT_KEY#<attempt-id>` | Server-side grading only; excluded from API/history queries |
-| Adaptive interview | `USER#<id>` | `ONBOARDING#active` | Resume private conversation, claims, and revision-guarded confirmation |
-| Career path | `USER#<id>` | `CAREER_PATH#active` | Save career goal and six focus skills; preserve opened paths as market demand changes |
-| Skill competencies | `USER#<id>` | `PATH#<skill>` | Three generated objectives and a revision used to guard concurrent grading |
-| Competency evidence | `USER#<id>` | `COMPETENCY#<skill>:<number>` | Latest objective-check result for a narrow topic |
-| Competency lesson | `USER#<id>` | `COMPETENCY_CONTENT#<id>` | Private structured explanation, examples, takeaways and practice |
-| Competency practice | `USER#<id>` | `PRACTICE#<id>` | Practice marker, not assessed evidence |
-| Last activity | `USER#<id>` | `ACTIVITY#active` | Resume a lesson or pending assessment |
-| Conversation | `USER#<id>` | `CHAT#active` | Revision-guarded private text history, bounded to 24 messages |
-| Generated lesson | `USER#<id>` | `CONTENT#<skill>` | Cache personalized lesson and exercise |
-| Roadmap | `USER#<id>` | `ROADMAP#active` | Get/replace compact derived learning plan |
-| Lesson progress | `USER#<id>` | `LESSON#<skill>` | Record that the candidate practiced the lesson |
-| Job | `JOB#<id>` | `DETAILS` | Get posting; scan compact job sample |
-| Match | `USER#<id>` | `MATCH#<job-id>` | Store derived supported/missing skill snapshot |
+| Account | `ACCOUNT#<normalized-email-hash>` | `CREDENTIALS` | Lookup by normalized email; stores user ID, email, Argon2 hash |
+| Session | `SESSION#<token-hash>` | `AUTH_SESSION` | Resolve identity and expiry; logout revokes the session |
+| Profile | `USER#<id>` | `PROFILE` | Own profile; consent-filtered employer discovery scans |
+| Current skill evidence | `USER#<id>` | `SKILL#<skill>` | Query the user's latest assessment-backed evidence |
+| Assessment attempt | `USER#<id>` | `ASSESSMENT#<attempt-id>` | Owned attempt and history, including evaluation/topic references |
+| Private answer key | `USER#<id>` | `ASSESSMENT_KEY#<attempt-id>` | Server-side grading only; excluded from public responses |
+| Background onboarding | `USER#<id>` | `ONBOARDING#active` | Four numbered answers, progress, and confirmation revision |
+| Learning evaluation | `USER#<id>` | `LEARNING_EVALUATION#active` | Three-question adaptive interview, grounded claims, goal, state, revision, evaluation ID |
+| Active career path | `USER#<id>` | `CAREER_PATH#active` | Ordered focus skills, summary, goal, and confirmed evaluation ID |
+| Generated skill path | `USER#<id>` | `PATH#<skill>` | Three competencies, evaluation ID, and grading revision |
+| Archived skill path | `USER#<id>` | `PATH_HISTORY#<evaluation-id-or-legacy>#<skill>` | Retain previous generated path content during replacement |
+| Competency evidence | `USER#<id>` | `COMPETENCY#<topic-id>` | Latest narrow-topic assessment result |
+| Competency lesson | `USER#<id>` | `COMPETENCY_CONTENT#<topic-id>` | Private explanation, examples, takeaways, practice |
+| Practice marker | `USER#<id>` | `PRACTICE#<topic-id>` | Record practice; does not establish skill evidence |
+| Last activity | `USER#<id>` | `ACTIVITY#active` | Resume a current lesson or assessment |
+| Chat history | `USER#<id>` | `CHAT#active` | Revision-guarded private history, latest 24 text messages |
+| Job | `JOB#<id>` | `DETAILS` | Public snapshot or employer-owned posting, sources and skill tags |
+| Match snapshot | `USER#<id>` | `MATCH#<job-id>` | Derived supported/missing requirements; no candidate-discovery cache |
+| Earlier broad-skill roadmap | `USER#<id>` | `ROADMAP#active` | Compact derived milestones used by retained service/API operations |
+| Broad-skill lesson | `USER#<id>` | `CONTENT#<skill>` | Retained standalone lesson cache |
+| Broad-skill practice | `USER#<id>` | `LESSON#<skill>` | Retained standalone practice/reassessment flow |
 
-`Profile.claimed_skills` is self-reported. It never contributes to assessed coverage. `SKILL#...` items contain the latest submitted assessment's score, pass status, attempt ID, date, and limited scope. A later failed assessment replaces the skill's current passing evidence; historical attempts remain intact.
+New topic IDs have the form `<skill>:<evaluation-id>-<1..3>`; earlier paths may use `<skill>:<1..3>`. Versioned IDs separate replacement-roadmap activity from prior attempts. Archived paths are stored data; there is no dedicated archive-browsing UI.
 
-Submission writes the completed assessment and skill evidence in one DynamoDB transaction, conditional on the attempt still being pending. The memory repository applies the same rule under a lock. A replay returns 409. A candidate cannot choose a user ID, role, score, pass status, or evidence ID in the submission contract.
+## Identity, privacy, and transactions
 
-Roadmaps compare AI-engineering job samples with demonstrated skills. Career switchers use the full active sample; students use internship/entry title labels and start with Python/SQL foundations. Changing the target-role text does not fetch a new career-specific dataset. A milestone becomes complete when its assessment passes. Lesson completion alone creates no evidence. In Bedrock mode, reassessment generates fresh questions using prior prompts and personal context; offline mode uses labeled reference fixtures.
+- Signup atomically inserts a UUID profile and credential record, conditional on the email key being absent. Normal startup creates no fixture accounts.
+- Authentication uses a random HttpOnly, SameSite=Strict cookie. Only the token digest is stored. Sessions default to four hours, rotate on login, and are revoked on logout. Expiry is enforced in application code; AWS TTL infrastructure is not provisioned.
+- Endpoints derive IDs and roles from the session. Profile edits cannot modify roles, scores, or assessment evidence. Login/signup attempt limits and origin checks are applied in FastAPI/auth code.
+- Onboarding confirmation atomically saves background and completed state with a revision guard. It creates neither an assessment nor a personal roadmap.
+- Learning evaluation checks skill excerpts against user answers. Confirmation validates model-selected focus IDs against market requirements and generates the first path before committing the profile, completed evaluation, active roadmap, path, and archives under the expected interview revision.
+- Re-evaluation leaves the old roadmap available until confirmation succeeds. Earlier attempts and evidence are retained; active progress uses the current version's topics. Changing profile goal text alone does not replace an evaluated roadmap.
+- Assessment generation stores public questions and private keys together. Submission accepts choices only; Python computes the result. Completed attempt/evidence writes require a pending attempt, and competency aggregation also checks the path revision. Replay or stale writes return 409.
+- Employer discovery checks posting ownership and current candidate opt-in every time. It returns relevant evidence and match explanations, excluding private answers, chat, and learning history.
 
-Matching is set intersection: supported requirements = normalized job skills intersecting currently passed assessment evidence. Coverage is `supported_count / required_count`; there is no hiring score. Bedrock tags job descriptions with normalized skill IDs, required/preferred status and exact source excerpts. If all identified skills are preferred, coverage uses that skill set; tags preserve the distinction. Users should review original postings. The sample spans nine employers and is not a market-wide survey.
+## Evidence and matching
 
-Onboarding confirmation writes the profile and completed interview atomically, conditional on the expected conversation revision. Only server-saved claims can be confirmed; clients cannot submit a replacement skill list through that endpoint. Interview excerpts must occur in the user's answers. They remain claims and never create `SKILL#` evidence. Private labels are scoped to that user's catalog.
+Self-reported background and `claimed_skills` provide generation context; they never count as assessed coverage. Standalone objective skill checks can establish limited Foundational evidence. For a competency path, all three topic passes are required to support the broader skill. Later failed assessments can invalidate current evidence while preserving attempt history. Applied/Demonstrated mastery is not awarded by quizzes.
 
-Employer discovery checks ownership of the selected posting and the candidate's current opt-in on every request. It returns only display name, current/target role, relevant evidence summaries, and skill gaps. Answers, private chat, claimed skills, and learning history are excluded. No discovery cache is persisted. The demo candidate profile is synthetic, but assessments taken through the UI are actually graded; only seeded evidence is synthetic.
+Matching intersects normalized job requirements with currently passed skill evidence. Coverage is `supported_count / required_count`, not a hiring score. Required/preferred tags retain exact source excerpts; if a posting has only preferred tags, coverage uses that tracked skill set. Career-stage labels do not establish eligibility. The saved public dataset focuses on AI engineering and related roles.
 
-The backend's Pydantic contracts are in `backend/models.py`; frontend response interfaces are in `frontend/src/api.ts`. `/docs` exposes FastAPI's OpenAPI UI. Routes derive identity from an expiring, HttpOnly account session cookie. Email/password signup and login support new users; three regular actor accounts are precreated. Passwords are hashed with Argon2, session tokens are stored only as digests, and logout revokes the session. See [authentication](AUTHENTICATION.md) for the additional account/session records in this same table.
+## Endpoint groups
 
-| Route | Role | Purpose |
+All paths below are relative to `/api`. Typed request/response schemas in OpenAPI are authoritative.
+
+| Endpoint | Access | Purpose |
 | --- | --- | --- |
-| `POST /api/auth/signup`, `POST /api/auth/login` | Public | Create an account or verify credentials; establish an expiring session |
-| `POST /api/auth/logout`, `GET /api/session` | Account | Revoke or inspect the current account session |
-| `GET /api/dashboard`, `PATCH /api/profile` | Candidate | Own profile, skills, roadmap, assessment history; update only allowed profile fields |
-| `GET /api/onboarding` | Candidate | Start or resume the private adaptive interview |
-| `POST /api/onboarding/answer`, `POST /api/onboarding/complete` | Candidate | Answer the current revision; confirm server-saved claims |
-| `POST /api/assessments`, `GET /api/assessments/{id}` | Candidate | Create/read own attempt, no pending answer key |
-| `POST /api/assessments/{id}/submit` | Candidate | Validate answers, grade in Python, atomically store evidence |
-| `GET /api/roadmap`, `GET /api/lessons/{skill}` | Candidate | Derived roadmap and working lesson |
-| `POST /api/lessons/{skill}/complete` | Candidate | Mark lesson practiced and prepare reassessment |
-| `GET /api/matches` | Candidate | Own evidence compared with job requirements |
-| `POST /api/jobs`, `GET /api/employer/jobs` | Employer | Create a posting; list own jobs |
-| `GET /api/employer/jobs/{id}/candidates` | Employer | Discover consenting profiles for an owned job |
-| `POST /api/chat` | Authenticated | Orchestrator response and actual specialist/tool delegation results |
-| `GET /api/jobs`, `GET /api/market` | Authenticated | Sample postings and deterministic skill frequencies |
+| `GET /health` | Public | Mode, model configuration, repository health response |
+| `POST /auth/signup`, `POST /auth/login` | Public | Register/authenticate and establish a cookie session |
+| `POST /auth/logout` | Cookie, if present | Revoke session and clear cookie |
+| `GET /session` | Account | Own profile, email, and AI mode |
+| `GET /dashboard`, `PATCH /profile` | Candidate | Own summary and allowed profile edits |
+| `GET /onboarding` | Candidate | Initialize/resume the four-question background flow |
+| `POST /onboarding/answer`, `POST /onboarding/complete` | Candidate | Validate answers/revision; confirm background |
+| `GET /learning` | Candidate | Read active plan; fresh users receive an empty plan |
+| `GET /learning/evaluation` | Candidate | Read current evaluation or null |
+| `POST /learning/evaluation` | Candidate | Start/resume an interview; begin a new one after completion |
+| `POST /learning/evaluation/answer` | Candidate | Generate a follow-up or review after the third answer |
+| `POST /learning/evaluation/complete` | Candidate | Confirm the reviewed profile and generate/replace the roadmap |
+| `POST /learning` | Candidate | Return an existing evaluated plan; evaluation required |
+| `POST /learning/{skill}/expand` | Candidate | Generate missing competencies in an evaluated roadmap |
+| `GET /competencies/{id}/lesson` | Candidate | Generate/read an owned competency lesson |
+| `POST /competencies/{id}/practice` | Candidate | Record practice and prepare an assessment |
+| `POST /assessments`, `GET /assessments/{id}` | Candidate | Explicitly create/read an owned attempt; no pending answer key |
+| `POST /assessments/next` | Candidate | Prepare the next evaluated-roadmap competency check |
+| `POST /assessments/{id}/submit` | Candidate | Deterministic grading and atomic evidence writes |
+| `GET /passport` | Candidate | Own skill/competency evidence and attempt history |
+| `GET /matches` | Candidate | Compare own evidence with shared postings |
+| `GET /roadmap`, `GET /lessons/{skill}`, `POST /lessons/{skill}/complete` | Candidate | Retained broad-skill roadmap/lesson operations |
+| `GET /jobs`, `GET /market` | Account | Shared active postings and counted requirements |
+| `POST /jobs`, `GET /employer/jobs` | Employer | Analyze/create a posting; list owned postings |
+| `GET /employer/jobs/{id}/candidates` | Employer | Discover consenting candidates for an owned posting |
+| `POST /chat`, `GET /chat/history` | Account | Orchestrator conversation/delegation and private text history |
 
-
-CareerBuddy adds `career_goal` (`stay_relevant`, `find_job`, `switch_careers`) to profiles. Skill evidence has server-derived mastery and optional supporting competency/assessment IDs. Passing a narrow topic writes only competency evidence. All three topic passes are needed to support the broader skill; a later failed competency invalidates that aggregate. Path revision and pending-attempt conditions guard these writes in one transaction. Standalone skill checks remain available. Quizzes award at most Foundational, never Applied or Demonstrated.
-
-Additional owner-scoped candidate endpoints: `GET /api/learning`, `POST /api/learning/{skill}/expand`, `GET /api/competencies/{id}/lesson`, `POST /api/competencies/{id}/practice`, `POST /api/assessments/next`, and `GET /api/passport`. `POST /api/assessments` accepts an optional owned `competency_id`; mismatched skill/topic pairs are rejected. `GET /api/chat/history` is available to both roles and returns only their own conversation text and specialist names.
+`GET /learning` does not create a roadmap for a fresh user. Some other reads derive/cache records or generate lesson content on explicit opening; this API is a local MVP rather than a uniformly read-only REST design.

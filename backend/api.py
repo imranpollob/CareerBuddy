@@ -201,16 +201,42 @@ def create_app(repo=None, settings=None):
     def roadmap(session=Depends(candidate)):
         return service.roadmap(session.uid)
 
+    from backend.evaluation import Evaluation
+    from backend.models import LearningEvaluation
+    evaluation=Evaluation(service)
+
+    @app.get('/api/learning/evaluation',response_model=LearningEvaluation | None)
+    def get_learning_evaluation(session=Depends(candidate)):
+        return evaluation.get(session.uid)
+
+    @app.post('/api/learning/evaluation',response_model=LearningEvaluation)
+    def begin_learning_evaluation(session=Depends(candidate)):
+        return evaluation.begin(session.uid)
+
+    @app.post('/api/learning/evaluation/answer',response_model=LearningEvaluation)
+    def answer_learning_evaluation(body:OnboardingAnswer,session=Depends(candidate)):
+        return evaluation.answer(session.uid,body.answer,body.revision)
+
+    @app.post('/api/learning/evaluation/complete',response_model=LearningRecord)
+    def complete_learning_evaluation(body:OnboardingConfirm,session=Depends(candidate)):
+        return evaluation.complete(session.uid,body.revision)
+
     @app.get("/api/learning",response_model=LearningRecord)
     def learning_plan(session=Depends(candidate)):
         return service.learning.plan(session.uid)
 
+    def require_learning_evaluation(uid):
+        if not (service.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}).get('evaluation_id'):
+            raise Conflict('Evaluate your profile in Learning before creating a roadmap.')
+
     @app.post("/api/learning",response_model=LearningRecord)
     def create_learning_plan(session=Depends(candidate)):
-        return service.learning.start(session.uid)
+        require_learning_evaluation(session.uid)
+        return service.learning.plan(session.uid)
 
     @app.post("/api/learning/{skill}/expand",response_model=LearningRecord)
     def expand_learning(skill:str,session=Depends(candidate)):
+        require_learning_evaluation(session.uid)
         return service.learning.expand(session.uid,skill)
 
     @app.get("/api/competencies/{competency_id}/lesson",response_model=LessonRecord)
@@ -223,6 +249,7 @@ def create_app(repo=None, settings=None):
 
     @app.post("/api/assessments/next",response_model=AssessmentRecord,response_model_exclude_none=True)
     def next_assessment(session=Depends(candidate)):
+        require_learning_evaluation(session.uid)
         return service.learning.next_assessment(session.uid)
 
     @app.get("/api/passport",response_model=PassportRecord)

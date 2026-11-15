@@ -91,3 +91,20 @@ def test_competency_path_and_conversation_survive_repository_reload(repository):
     assert restored.learning.plan(uid)["completed_topics"]==3
     assert restored.learning.passport(uid)["skills"][0]["mastery"]=="foundational"
     assert conversation.history(repository,uid)["messages"][-1]["text"]=="Welcome back"
+
+
+def test_learning_evaluation_and_replacement_survive_reload(repository):
+    from backend.config import Settings
+    from backend.evaluation import Evaluation
+    service=Service(repository,Settings(ai_mode='mock',seed_accounts=True));service.seed(include_samples=True)
+    evaluation=Evaluation(service);uid='candidate-demo'
+    state=evaluation.begin(uid)
+    for answer in ['I use Python and SQL and want an AI Engineer role.','I built a Python FastAPI project with SQL.','I owned the API and tests and want to learn LLMs.']:
+        state=evaluation.answer(uid,answer,state['revision'])
+    first=evaluation.complete(uid,state['revision'])
+    restored=Service(repository,Settings(ai_mode='mock',seed_accounts=True))
+    assert restored.learning.plan(uid)==first
+    assert Evaluation(restored).get(uid)['status']=='completed'
+    next_state=Evaluation(restored).begin(uid)
+    assert next_state['id']!=state['id']
+    assert restored.learning.plan(uid)==first
