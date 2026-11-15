@@ -20,6 +20,8 @@ from backend.models import LoginRequest, SignupRequest, AccountSession
 from backend.models import OnboardingState, OnboardingAnswer, OnboardingConfirm
 from backend.onboarding import Onboarding
 from backend.intelligence import GenerationError
+from backend.models import LearningRecord, PassportRecord, ConversationRecord
+from backend import conversation
 
 ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"]
 
@@ -29,7 +31,6 @@ class Session:
     uid: str
     role: str
     email: str
-    history: list = field(default_factory=list)
     lock: Lock = field(default_factory=Lock)
 
 
@@ -50,7 +51,7 @@ def create_app(repo=None, settings=None):
         auth.seed_actors()
         yield
 
-    app = FastAPI(title="SkillPilot", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="CareerBuddy", version="0.2.0", lifespan=lifespan)
     app.state.service = service
     app.state.auth = auth
     app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=True,
@@ -186,7 +187,7 @@ def create_app(repo=None, settings=None):
 
     @app.post("/api/assessments", response_model=AssessmentRecord, response_model_exclude_none=True)
     def create_assessment(body: AssessmentCreate, session=Depends(candidate)):
-        return service.create_assessment(session.uid, body.skill)
+        return service.create_assessment(session.uid, body.skill,competency_id=body.competency_id)
 
     @app.get("/api/assessments/{assessment_id}", response_model=AssessmentRecord, response_model_exclude_none=True)
     def assessment(assessment_id: str, session=Depends(candidate)):
@@ -199,6 +200,30 @@ def create_app(repo=None, settings=None):
     @app.get("/api/roadmap", response_model=RoadmapRecord)
     def roadmap(session=Depends(candidate)):
         return service.roadmap(session.uid)
+
+    @app.get("/api/learning",response_model=LearningRecord)
+    def learning_plan(session=Depends(candidate)):
+        return service.learning.plan(session.uid)
+
+    @app.post("/api/learning/{skill}/expand",response_model=LearningRecord)
+    def expand_learning(skill:str,session=Depends(candidate)):
+        return service.learning.expand(session.uid,skill)
+
+    @app.get("/api/competencies/{competency_id}/lesson",response_model=LessonRecord)
+    def competency_lesson(competency_id:str,session=Depends(candidate)):
+        return service.learning.lesson(session.uid,competency_id)
+
+    @app.post("/api/competencies/{competency_id}/practice",response_model=AssessmentRecord,response_model_exclude_none=True)
+    def competency_practice(competency_id:str,session=Depends(candidate)):
+        return service.learning.practice(session.uid,competency_id)
+
+    @app.post("/api/assessments/next",response_model=AssessmentRecord,response_model_exclude_none=True)
+    def next_assessment(session=Depends(candidate)):
+        return service.learning.next_assessment(session.uid)
+
+    @app.get("/api/passport",response_model=PassportRecord)
+    def passport(session=Depends(candidate)):
+        return service.learning.passport(session.uid)
 
     @app.get("/api/lessons/{skill}", response_model=LessonRecord)
     def lesson(skill: str, session=Depends(candidate)):
@@ -224,18 +249,20 @@ def create_app(repo=None, settings=None):
     def candidates(job_id: str, session=Depends(employer)):
         return service.candidates(session.uid, job_id)
 
+    @app.get("/api/chat/history",response_model=ConversationRecord)
+    def chat_history(session=Depends(authenticated)):
+        return conversation.history(repo,session.uid)
+
     @app.post("/api/chat", response_model=ChatResponse)
     def chat_endpoint(body: ChatRequest, session=Depends(authenticated)):
         with session.lock:
+            saved_history=conversation.history(repo,session.uid)
             try:
-                response, _ = chat(service, settings, session.uid, session.role, body.message, session.history)
+                response, _ = chat(service, settings, session.uid, session.role, body.message, conversation.model_messages(saved_history))
             except Exception as exc:
                 logging.getLogger(__name__).warning("Agent request failed: %s", type(exc).__name__)
                 raise HTTPException(503, "The AI service could not complete this request. Your evidence is safe. Retry or use the dashboard controls.") from exc
-            # Retain only conversational text; specialists reload authoritative records.
-            session.history.extend([{"role": "user", "content": [{"text": body.message}]},
-                                    {"role": "assistant", "content": [{"text": response.message}]}])
-            session.history = session.history[-12:]
+            conversation.append(repo,session.uid,saved_history,body.message,response)
             return response
 
     return app

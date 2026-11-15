@@ -8,13 +8,13 @@ def run(service, settings, uid, role, request):
     captured = []
 
     @tool
-    def prepare_skill_assessment(skill: str = "python") -> dict:
+    def prepare_skill_assessment(skill: str = "") -> dict:
         """Generate a personalized four-question assessment for a normalized skill identified in the profile or job sample.
 
         Args:
-            skill: The normalized skill to assess. Default python.
+            skill: A requested normalized skill; leave empty for the next roadmap competency.
         """
-        data = service.create_assessment(uid, skill)
+        data = service.create_assessment(uid, skill) if skill else service.learning.next_assessment(uid)
         captured.append(data)
         return data
 

@@ -11,9 +11,14 @@ def run(service, settings, uid, role, request):
     def get_learning_plan() -> dict:
         """Compare assessment evidence to job requirements and retrieve prioritized learning milestones."""
         roadmap = service.roadmap(uid)
+        path=service.learning.plan(uid)
+        if path["next_topic"] is None:
+            missing=next((s for s in path["skills"] if s["mastery"]=="not_assessed" and not s["expanded"]),None)
+            if missing:
+                path=service.learning.expand(uid,missing["skill"])
         next_steps=[m for m in roadmap["milestones"] if m["status"]!="completed"][:1]
-        data = {"profile": service.profile(uid), "journey": service.journey(uid), "roadmap": roadmap, "assessed_skills": service.skills(uid),
-                "lessons": [service.lesson(uid, m["skill"]) for m in next_steps]}
+        data = {"profile": service.profile(uid), "journey": service.journey(uid), "roadmap": roadmap, "career_path":path,"assessed_skills": service.skills(uid),
+                "lessons": ([service.learning.lesson(uid,path["next_topic"]["id"])] if path["next_topic"] else [service.lesson(uid, m["skill"]) for m in next_steps])}
         captured.append(data)
         return data
 

@@ -71,3 +71,23 @@ def test_interview_revision_atomically_guards_profile_updates(repository):
         repository.write([item(pk,"ONBOARDING#active",{"revision":2}),item(pk,"PROFILE",{"name":"Stale overwrite"})],expected_revision=(pk,"ONBOARDING#active",0))
     assert repository.get(pk,"PROFILE")["name"]=="Confirmed"
     assert repository.get(pk,"ONBOARDING#active")["revision"]==1
+
+
+def test_competency_path_and_conversation_survive_repository_reload(repository):
+    from backend.config import Settings
+    from backend import conversation
+    from backend.models import ChatResponse
+    service=Service(repository,Settings(ai_mode="mock"));service.seed()
+    uid="candidate-demo"
+    skill=service.learning.plan(uid)["skills"][0]["skill"]
+    path=service.learning.expand(uid,skill)
+    topics=next(s for s in path["skills"] if s["skill"]==skill)["topics"]
+    for topic in topics:
+        attempt=service.create_assessment(uid,skill,competency_id=topic["id"])
+        key=repository.get(f"USER#{uid}",f"ASSESSMENT_KEY#{attempt['id']}")
+        service.submit(uid,attempt["id"],{q["id"]:int(q["correct_index"]) for q in key["questions"]})
+    conversation.append(repository,uid,conversation.history(repository,uid),"Hello",ChatResponse(message="Welcome back",mode="mock",delegations=[]))
+    restored=Service(repository,Settings(ai_mode="mock"))
+    assert restored.learning.plan(uid)["completed_topics"]==3
+    assert restored.learning.passport(uid)["skills"][0]["mastery"]=="foundational"
+    assert conversation.history(repository,uid)["messages"][-1]["text"]=="Welcome back"

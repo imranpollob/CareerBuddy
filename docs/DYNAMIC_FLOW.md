@@ -30,3 +30,9 @@ The importer enforces a 50-job minimum and preserves tags for unchanged descript
 Bedrock mode uses Amazon Nova 2 Lite through Strands. Mock mode uses labeled deterministic interview/question/lesson fixtures. There is no silent mock fallback on inference failure. Generation errors return retryable 503 responses and preserve saved progress. No deployment or paid AWS resource creation is required; inference uses permitted account credits.
 
 The agents-as-tools architecture remains: five agent roles and nine custom tools. Authoring tasks reuse those roles through typed Strands calls. Matching, scoring, ownership and consent checks remain deterministic Python.
+
+## CareerBuddy roadmap and passport
+
+Candidates now land on persistent AI Chat. Profile, Learning, Assessments and Jobs have separate navigation. A saved six-skill career path is built from current sampled requirements; opened paths remain stable while unstarted focus slots can adapt to demand. Each expanded skill receives three generated competencies. Lessons and objective assessments target those objectives, and last activity is saved for continuation.
+
+Competency evidence stays separate from whole-skill evidence. All three passes support a Foundational aggregate; a later failed competency invalidates that aggregate. Revision guards prevent concurrent topic submissions from losing aggregate progress. The Skill Passport exposes dates, scope, assessment references and feedback, while Applied and Demonstrated remain later practical-assessment levels. See [CareerBuddy status](CAREERBUDDY_IMPLEMENTATION.md).

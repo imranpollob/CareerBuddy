@@ -1,4 +1,6 @@
-# SkillPilot
+# CareerBuddy
+
+CareerBuddy is the updated product experience built on the SkillPilot hackathon backend. Internal `SKILLPILOT_*` configuration names, the `SkillPilot` DynamoDB table, and the existing actor accounts are retained.
 
 A local-first career intelligence MVP for the BuilderWars AWS hackathon. One Strands orchestrator delegates to four real specialist agents, backed by Amazon Bedrock and one DynamoDB table. React dashboards connect assessment evidence, learning, and explainable job matching.
 
@@ -61,7 +63,7 @@ The app opens on email/password sign-in. Signup asks only for name, email, passw
 
 Three actor accounts are precreated: **Alex Morgan** (`alex@example.com`), **Priya Shah** (`priya@example.com`), and **Jordan Lee** (`jordan@example.com`). Their random initial passwords are stored privately in ignored `.local/actor-accounts.json` after the first backend startup. Open that file locally; do not commit or publish it. These accounts use the same login form as everyone else. The former demo identity selector and passwordless demo endpoints have been removed.
 
-The dashboard focuses on a next step, skill summary, and learning progress. Detailed skills and milestones are in separate tabs. **Ask SkillPilot** opens the assistant when needed. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
+Candidates land on **AI Chat**, with private conversation history and suggestions for their next step. The sidebar opens **My Profile**, **Learning**, **Assessments**, and **Jobs**. Learning contains one saved visual career roadmap, generated competencies and lessons; Assessments contains the Skill Passport and attempt history. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
 
 ## Tests
 
@@ -86,6 +88,8 @@ backend/
   tools/                 Deterministic grading, skill normalization, matching
   service.py             Authorized workflow operations and derived views
   onboarding.py          Persisted adaptive interview and skill confirmation
+  learning.py            Saved roadmap, competency lessons, progress, passport
+  conversation.py        Private persisted text history with revision guards
   intelligence.py        Validated Strands generation for interviews/content/tags
   db.py                  Memory and single-table DynamoDB repositories
   models.py              Strict Pydantic request/output contracts
@@ -118,6 +122,8 @@ uv run python -m scripts.tag_jobs
 Importing creates no AWS resources and requires no job-API key; tagging uses permitted Bedrock inference credits. Both scripts update the dataset manifest. The importer refuses to replace the snapshot with fewer than 50 real postings and preserves existing tags for unchanged descriptions. Restart the API to load the updated snapshot; profile edits, consent, and assessment evidence are preserved.
 
 The sample supports AI-engineering career transitions and first-role seekers. New users are not restricted to the actors or a fixed skill list: interviews, assessments, and lessons use their own context. Assessments are AI-authored objective checks with private server-held keys and deterministic grading; they are limited evidence, not certification. Mock mode uses explicitly labeled fixtures. Editing the target-role label does not fetch another career dataset. Open-ended exercise grading, broad job crawling, email verification/password reset, and production employer verification are outside this MVP. See [the dynamic workflow](docs/DYNAMIC_FLOW.md).
+
+The new plan and feature status are in [CareerBuddy implementation](docs/CAREERBUDDY_IMPLEMENTATION.md). The live competency-flow check is `uv run python -m scripts.career_path_smoke` with DynamoDB Local running; it uses Bedrock credits and removes its temporary profile.
 
 See [data model and API](docs/DATA_MODEL.md), [AWS/model verification](docs/AWS_SETUP.md), [validation status](docs/VALIDATION.md), and [AgentCore preparation](docs/DEPLOYMENT.md).
 

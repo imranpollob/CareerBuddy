@@ -33,13 +33,13 @@ class MockModel(Model):
                 name = next(iter(specs))
                 inputs = {}
                 if name == "prepare_skill_assessment":
-                    inputs["skill"] = next((s for s in ["python", "rag", "llm", "pytorch", "aws", "evaluation", "sql"] if s in prompt.lower()), "python")
+                    inputs["skill"] = next((s for s in ["python", "rag", "llm", "pytorch", "aws", "evaluation", "sql"] if s in prompt.lower()), "" if "next" in prompt.lower() else "python")
                 tools = [(name, inputs)]
             else:
                 text = prompt.lower()
                 if any(w in text for w in ["assess", "quiz", "test", "reassess"]):
                     tools.append(("assessment_specialist", {"request": prompt}))
-                if any(w in text for w in ["coach", "roadmap", "learn", "lesson", "gap"]):
+                if any(w in text for w in ["coach", "roadmap", "learn", "lesson", "gap", "evaluate my profile"]):
                     tools.append(("coach_specialist", {"request": prompt}))
                 if any(w in text for w in ["match", "recommend", "candidate", "find jobs"]):
                     tools.append(("marketplace_specialist", {"request": prompt}))
@@ -78,7 +78,7 @@ class MockModel(Model):
                             pass
                 output = "\n\n".join(summaries) or "The requested data is available in your dashboard."
             else:
-                output = "I’m SkillPilot. I can analyze job requirements, prepare a skills assessment, create a learning roadmap, or explain job matches. What would you like to work on?"
+                output = "I’m CareerBuddy. I can analyze job requirements, prepare a skills assessment, create a learning roadmap, or explain job matches. What would you like to work on?"
             yield {"contentBlockStart": {"start": {}, "contentBlockIndex": 0}}
             yield {"contentBlockDelta": {"delta": {"text": output}, "contentBlockIndex": 0}}
             yield {"contentBlockStop": {"contentBlockIndex": 0}}

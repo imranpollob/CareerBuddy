@@ -47,6 +47,7 @@ class Onboarding:
                  "question":turn.question,"messages":messages+[{"role":"assistant","content":turn.question}],
                  "claims":claims,"current_role":turn.current_role,"target_role":turn.target_role,
                  "candidate_track":turn.candidate_track}
+        updated["career_goal"]=turn.career_goal
         self.repo.write([item(f"USER#{uid}","ONBOARDING#active",updated)],expected_revision=(f"USER#{uid}","ONBOARDING#active",revision))
         return self.public(updated)
 
@@ -56,6 +57,7 @@ class Onboarding:
             raise Conflict("Review the current skill summary before confirming")
         profile=Profile.model_validate({**self.service.profile(uid),"current_role":state["current_role"],"target_role":state["target_role"],
                                         "candidate_track":state["candidate_track"],"claimed_skills":[c["skill"] for c in state["claims"]],
+                                        "career_goal":state.get("career_goal","switch_careers"),
                                         "onboarding_completed":True}).model_dump()
         updated={**state,"revision":revision+1,"status":"completed"}
         writes=[item(f"USER#{uid}","PROFILE",profile),item(f"USER#{uid}","ONBOARDING#active",updated)]

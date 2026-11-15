@@ -3,6 +3,7 @@ from copy import deepcopy
 from threading import RLock
 from typing import Protocol
 import json
+from decimal import Decimal
 from urllib.parse import urlparse
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
@@ -22,7 +23,13 @@ class Repository(Protocol):
 
 def item(pk: str, sk: str, data: dict) -> dict:
     value = {"PK": pk, "SK": sk, "data": data}
-    if len(json.dumps(value).encode()) > 350_000:
+    # boto3 returns Decimal values when records are reloaded. Preserve them for
+    # DynamoDB writes while using their JSON numeric form for the size guard.
+    def numeric(value):
+        if isinstance(value,Decimal):
+            return int(value) if value==value.to_integral_value() else float(value)
+        raise TypeError("Record contains a non-JSON value")
+    if len(json.dumps(value,default=numeric).encode()) > 350_000:
         raise ValueError("Record exceeds the MVP item size limit")
     return value
 

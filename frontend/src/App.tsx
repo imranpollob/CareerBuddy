@@ -1,80 +1,52 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, BriefcaseBusiness, Check, Compass, LayoutDashboard, LogOut, MessageCircle, Settings, Users, X } from 'lucide-react'
-import { api, ApiError, LABELS, setSkillCatalog, type Assessment as Attempt, type Dashboard, type Match, type AccountSession, type ProfileUpdate, type Lesson, type ChatResponse } from './api'
-import { CandidateDashboard } from './pages/CandidateDashboard'
-import { EmployerDashboard } from './pages/EmployerDashboard'
-import { Marketplace } from './pages/Marketplace'
-import { AuthPage } from './pages/AuthPage'
-import { OnboardingPage } from './pages/OnboardingPage'
-import { Chat } from './components/Chat'
-import { Assessment } from './components/Assessment'
-import { Modal } from './components/Modal'
-import { ThemeToggle } from './components/ThemeToggle'
-import { AssistantDrawer } from './components/AssistantDrawer'
-
+import {useEffect,useState} from 'react'
+import {ArrowRight,BookOpen,BriefcaseBusiness,Compass,LogOut,MessageCircle,ShieldCheck,UserRound,Users,X} from 'lucide-react'
+import {api,ApiError,setSkillCatalog,GOALS,skillLabel,type Assessment as Attempt,type Dashboard,type Match,type AccountSession,type ProfileUpdate,type Lesson,type ChatResponse,type LearningPlan,type Passport,type Topic} from './api'
+import {AuthPage} from './pages/AuthPage'
+import {OnboardingPage} from './pages/OnboardingPage'
+import {EmployerDashboard} from './pages/EmployerDashboard'
+import {Marketplace} from './pages/Marketplace'
+import {LearningPage} from './pages/LearningPage'
+import {PassportPage} from './pages/PassportPage'
+import {ProfilePage} from './pages/ProfilePage'
+import {Chat} from './components/Chat'
+import {Assessment} from './components/Assessment'
+import {Modal} from './components/Modal'
+import {ThemeToggle} from './components/ThemeToggle'
+type View='chat'|'profile'|'learning'|'assessments'|'jobs'|'hiring'
+const NAV=[{id:'chat',label:'AI Chat',description:'Career assistant',icon:MessageCircle},{id:'profile',label:'My Profile',description:'Career goal and skills',icon:UserRound},{id:'learning',label:'Learning',description:'Roadmaps and lessons',icon:BookOpen},{id:'assessments',label:'Assessments',description:'Skill mastery and evidence',icon:ShieldCheck},{id:'jobs',label:'Jobs',description:'Career opportunities',icon:BriefcaseBusiness}] as const
 export default function App(){
-  const [account,setAccount]=useState<AccountSession|null>(null)
-  const [view,setView]=useState<'dashboard'|'marketplace'>('dashboard')
-  const [data,setData]=useState<Dashboard|null>(null)
-  const [matches,setMatches]=useState<Match[]>([])
-  const [attempt,setAttempt]=useState<Attempt|null>(null)
-  const [lesson,setLesson]=useState<Lesson|null>(null)
-  const [profile,setProfile]=useState<ProfileUpdate|null>(null)
-  const [error,setError]=useState('')
-  const [loading,setLoading]=useState(true)
-  const [busy,setBusy]=useState(false)
-  const [notice,setNotice]=useState('')
-  const [chatOpen,setChatOpen]=useState(false)
+ const [account,setAccount]=useState<AccountSession|null>(null)
+ const [view,setView]=useState<View>('chat')
+ const [data,setData]=useState<Dashboard|null>(null)
+ const [matches,setMatches]=useState<Match[]>([])
+ const [plan,setPlan]=useState<LearningPlan|null>(null)
+ const [passport,setPassport]=useState<Passport|null>(null)
+ const [attempt,setAttempt]=useState<Attempt|null>(null)
+ const [lesson,setLesson]=useState<Lesson|null>(null)
+ const [error,setError]=useState('')
+ const [loading,setLoading]=useState(true)
+ const [busy,setBusy]=useState(false)
+ const [chatVersion,setChatVersion]=useState(0)
+ function clear(){setSkillCatalog();setAccount(null);setData(null);setMatches([]);setPlan(null);setPassport(null);setAttempt(null);setLesson(null)}
+ function handleError(e:unknown){setError(e instanceof Error?e.message:String(e));if(e instanceof ApiError&&e.status===401)clear()}
+ async function refresh(){const [d,m,p,pass]=await Promise.all([api<Dashboard>('/dashboard'),api<Match[]>('/matches'),api<LearningPlan>('/learning'),api<Passport>('/passport')]);setSkillCatalog(d.skill_catalog);setData(d);setMatches(m);setPlan(p);setPassport(pass);setAccount(a=>a?{...a,profile:d.profile}:a)}
+ async function authenticated(session:AccountSession){setSkillCatalog();setAccount(session);setLoading(true);setError('');setView(session.profile.role==='employer'?'hiring':'chat');try{if(session.profile.role==='candidate'&&session.profile.onboarding_completed)await refresh()}catch(e){handleError(e)}finally{setLoading(false)}}
+ useEffect(()=>{void api<AccountSession>('/session').then(authenticated).catch(e=>{if(!(e instanceof ApiError&&e.status===401))handleError(e);setLoading(false)})},[])
+ async function signOut(){setBusy(true);try{await api('/auth/logout','POST');clear();setError('')}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function assess(skill:string,competency_id?:string){setBusy(true);setError('');try{setAttempt(await api<Attempt>('/assessments','POST',{skill,competency_id}));await refresh()}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function nextAssessment(){setBusy(true);setError('');try{setAttempt(await api<Attempt>('/assessments/next','POST'));await refresh()}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function expand(skill:string){setBusy(true);setError('');try{setPlan(await api<LearningPlan>(`/learning/${encodeURIComponent(skill)}/expand`,'POST'))}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function openTopic(topic:Pick<Topic,'id'>){setBusy(true);setError('');try{setLesson(await api<Lesson>(`/competencies/${encodeURIComponent(topic.id)}/lesson`));await refresh()}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function completeLesson(){if(!lesson)return;setBusy(true);setError('');try{const path=lesson.competency_id?`/competencies/${encodeURIComponent(lesson.competency_id)}/practice`:`/lessons/${lesson.skill}/complete`;setAttempt(await api<Attempt>(path,'POST'));setLesson(null);await refresh()}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function onChat(result:ChatResponse){if(account?.profile.role==='candidate'){await refresh();const a=result.delegations.find(d=>d.specialist==='assessment');if(a?.result.data.id)setAttempt(await api<Attempt>(`/assessments/${a.result.data.id}`))}}
+ async function evaluate(){setView('chat');setBusy(true);setError('');try{const response=await api<ChatResponse>('/chat','POST',{message:'Evaluate my profile and explain my next step in the career roadmap.'});await onChat(response);setChatVersion(v=>v+1)}catch(e){handleError(e)}finally{setBusy(false)}}
+ async function saveProfile(profile:ProfileUpdate){setBusy(true);setError('');try{await api('/profile','PATCH',profile);await refresh();return true}catch(e){handleError(e);return false}finally{setBusy(false)}}
+ async function onboarded(profile:AccountSession['profile']){if(!account)return;setAccount({...account,profile});setLoading(true);try{await refresh();setAttempt(await api<Attempt>('/assessments','POST',{skill:profile.claimed_skills[0]||'python'}))}catch(e){handleError(e)}finally{setLoading(false)}}
+ function continueLearning(){const activity=plan?.activity;if(activity?.kind==='assessment'){const a=data?.assessments.find(a=>a.id===activity.assessment_id&&a.status==='pending');if(a){setAttempt(a);return}if(plan?.next_topic){void openTopic(plan.next_topic);return}setView('learning');return}if(activity?.competency_id){const completed=plan?.skills.flatMap(s=>s.topics).find(t=>t.id===activity.competency_id)?.status==='completed';if(!completed){void openTopic({id:activity.competency_id});return}}if(plan?.next_topic){void openTopic(plan.next_topic);return}setView('learning')}
 
-  function handleError(e:unknown){
-    setError(e instanceof Error?e.message:String(e))
-    if(e instanceof ApiError&&e.status===401){setSkillCatalog();setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null)}
-  }
-  async function refresh(){
-    const [dashboard,jobMatches]=await Promise.all([api<Dashboard>('/dashboard'),api<Match[]>('/matches')])
-    setSkillCatalog(dashboard.skill_catalog);setData(dashboard);setMatches(jobMatches);setAccount(a=>a?{...a,profile:dashboard.profile}:a)
-  }
-  async function authenticated(session:AccountSession){
-    setSkillCatalog()
-    setAccount(session);setLoading(true);setError('');setNotice('');setView('dashboard')
-    try{if(session.profile.role==='candidate'&&session.profile.onboarding_completed)await refresh()}catch(e){handleError(e)}finally{setLoading(false)}
-  }
-  useEffect(()=>{void api<AccountSession>('/session').then(authenticated).catch(e=>{if(!(e instanceof ApiError&&e.status===401))handleError(e);setLoading(false)})},[])
-  async function signOut(){
-    setBusy(true)
-    try{await api('/auth/logout','POST');setSkillCatalog();setAccount(null);setData(null);setMatches([]);setChatOpen(false);setProfile(null);setLesson(null);setAttempt(null);setNotice('');setError('')}
-    catch(e){handleError(e)}finally{setBusy(false)}
-  }
-  async function assess(skill:string){setBusy(true);try{setAttempt(await api<Attempt>('/assessments','POST',{skill}))}catch(e){handleError(e)}finally{setBusy(false)}}
-  async function openLesson(skill:string){setBusy(true);try{setLesson(await api<Lesson>(`/lessons/${skill}`))}catch(e){handleError(e)}finally{setBusy(false)}}
-  async function completeLesson(){if(!lesson)return;setBusy(true);try{setAttempt(await api<Attempt>(`/lessons/${lesson.skill}/complete`,'POST'));setLesson(null);await refresh()}catch(e){handleError(e)}finally{setBusy(false)}}
-  async function saveProfile(e:React.FormEvent){e.preventDefault();if(!profile)return;setBusy(true);try{await api('/profile','PATCH',profile);await refresh();setProfile(null);setNotice('Your profile has been updated.')}catch(e){handleError(e)}finally{setBusy(false)}}
-  function editProfile(){if(!account)return;const {name,current_role,target_role,claimed_skills,marketplace_opt_in}=account.profile;setProfile({name,current_role,target_role,claimed_skills,marketplace_opt_in})}
-  async function onChat(result:ChatResponse){
-    if(account?.profile.role==='candidate'){
-      await refresh();const delegated=result.delegations.find(d=>d.specialist==='assessment')
-      if(delegated?.result.data.id){setChatOpen(false);setAttempt(await api<Attempt>(`/assessments/${delegated.result.data.id}`))}
-    }
-  }
-  if(loading&&!account)return <div className="loading"><Compass size={32}/><p>Opening your workspace…</p></div>
-  if(!account)return <>{error&&<div className="global-alert" role="alert">{error}</div>}<AuthPage onSuccess={authenticated}/></>
-  async function onboarded(profile:AccountSession['profile']){
-    if(!account)return
-    setAccount({...account,profile});setLoading(true)
-    try{await refresh();const skill=profile.claimed_skills[0]||'python';setAttempt(await api<Attempt>('/assessments','POST',{skill}))}catch(e){handleError(e)}finally{setLoading(false)}
-  }
-  if(account.profile.role==='candidate'&&!account.profile.onboarding_completed)return <OnboardingPage name={account.profile.name} onComplete={onboarded} onSignOut={()=>void signOut()}/>
-  const {profile:me}=account
-  const employer=me.role==='employer'
-  return <div className="app-shell product-shell"><aside className="sidebar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setView('dashboard')}}><span className="brand-mark"><Compass size={24}/></span>skillpilot<span className="brand-dot">.</span></a><nav aria-label="Main navigation"><button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>{employer?<Users size={18}/>:<LayoutDashboard size={18}/>} {employer?'Hiring workspace':'Overview'}</button>{!employer&&<button className={view==='marketplace'?'active':''} onClick={()=>setView('marketplace')}><BriefcaseBusiness size={18}/>Find jobs</button>}</nav><div className="account-menu"><div className="account-identity"><span className="avatar">{me.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</span><div><b>{me.name}</b><small>{account.email}</small></div></div>{!employer&&<button className="account-action" onClick={editProfile}><Settings size={16}/>My profile</button>}<button className="account-action" disabled={busy} onClick={()=>void signOut()}><LogOut size={16}/>Sign out</button></div></aside>
-    <div className="main-shell"><header className="topbar"><div className="breadcrumbs">{employer?'Talent workspace':view==='marketplace'?'Opportunities':'Career workspace'}</div><div className="topbar-actions"><ThemeToggle/><button className="button assistant-trigger" onClick={()=>setChatOpen(true)}><MessageCircle size={16}/>Ask SkillPilot</button><button className="mobile-signout icon-button" aria-label="Sign out" onClick={()=>void signOut()}><LogOut size={18}/></button></div></header>
-      {error&&<div className="global-alert" role="alert"><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
-      {notice&&<div className="success-alert" role="status"><Check size={16}/><span>{notice}</span><button className="icon-button" aria-label="Dismiss notification" onClick={()=>setNotice('')}><X size={16}/></button></div>}
-      {loading?<div className="loading"><p>Loading your workspace…</p></div>:<div className="content-layout"><main>{employer?<EmployerDashboard key={me.id} onError={setError}/>:data?view==='marketplace'?<Marketplace matches={matches} student={me.candidate_track==='student'}/>:<CandidateDashboard data={data} onProfile={editProfile} onAssess={s=>void assess(s)} onLesson={s=>void openLesson(s)} onMarketplace={()=>setView('marketplace')} onResume={setAttempt}/>:<div className="empty"><p>We couldn’t load your workspace.</p><button className="button" onClick={()=>void authenticated(account)}>Try again</button></div>}</main></div>}
-    </div>
-    <AssistantDrawer open={chatOpen} onClose={()=>setChatOpen(false)}><Chat key={me.id} role={me.role} mode={account.mode} onResult={onChat}/></AssistantDrawer>
-    {attempt&&<Assessment key={attempt.id} attempt={attempt} onClose={()=>setAttempt(null)} onSaved={refresh}/>}
-    {lesson&&<Modal title={lesson.title} onClose={()=>setLesson(null)}><span className="pill">Practice, then reassess</span><p className="lesson-content">{lesson.content}</p><div className="exercise"><h3>Try it yourself</h3><p>{lesson.exercise}</p><p className="muted text-sm">Practice locally or on paper. The next assessment records evidence of understanding.</p></div><button className="button primary wide" disabled={busy} onClick={()=>void completeLesson()}>I’ve practiced · Start reassessment<ArrowRight size={16}/></button></Modal>}
-    {profile&&<Modal title="My profile" onClose={()=>setProfile(null)}><form className="profile-form" onSubmit={saveProfile}><label>Name<input required maxLength={80} value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><div className="form-grid"><label>Current role<input required maxLength={120} value={profile.current_role} onChange={e=>setProfile({...profile,current_role:e.target.value})}/></label><label>Career goal<input required maxLength={120} value={profile.target_role} onChange={e=>setProfile({...profile,target_role:e.target.value})}/></label></div><fieldset><legend>Self-reported skills</legend><div className="checkboxes">{[...new Set([...profile.claimed_skills,...(data?.market.requirements.slice(0,10).map(r=>r.skill)||[])])].map(s=>{const label=LABELS[s]||s.replaceAll('_',' ');return <label key={s}><input type="checkbox" checked={profile.claimed_skills.includes(s)} onChange={e=>setProfile({...profile,claimed_skills:e.target.checked?[...profile.claimed_skills,s]:profile.claimed_skills.filter(x=>x!==s)})}/>{label}</label>})}</div></fieldset><label className="opt-in"><input type="checkbox" checked={profile.marketplace_opt_in} onChange={e=>setProfile({...profile,marketplace_opt_in:e.target.checked})}/><span><b>Make my profile discoverable to employers</b><small>Share your name, role, and relevant assessment evidence. You can turn this off at any time.</small></span></label><p className="muted text-sm">Assessment results are updated only through graded submissions.</p><button className="button primary wide" disabled={busy}>{busy?'Saving…':'Save profile'}</button></form></Modal>}
-  </div>
+ if(loading&&!account)return <div className="loading"><Compass size={32}/><p>Opening your workspace…</p></div>
+ if(!account)return <>{error&&<div className="global-alert" role="alert">{error}</div>}<AuthPage onSuccess={authenticated}/></>
+ if(account.profile.role==='candidate'&&!account.profile.onboarding_completed)return <OnboardingPage name={account.profile.name} onComplete={onboarded} onSignOut={()=>void signOut()}/>
+ const me=account.profile,employer=me.role==='employer'
+ return <div className="app-shell product-shell careerbuddy-shell"><aside className="sidebar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setView(employer?'hiring':'chat')}}><span className="brand-mark"><Compass size={23}/></span>careerbuddy<span className="brand-dot">.</span></a><nav aria-label="Main navigation">{employer?<><button className={view==='hiring'?'active':''} onClick={()=>setView('hiring')}><Users size={19}/><span>Hiring workspace</span></button><button className={view==='chat'?'active':''} onClick={()=>setView('chat')}><MessageCircle size={19}/><span>AI Chat</span></button></>:NAV.map(n=><button key={n.id} aria-current={view===n.id?'page':undefined} className={view===n.id?'active':''} onClick={()=>setView(n.id)}><n.icon size={19}/><span>{n.label}<small>{n.description}</small></span></button>)}</nav><div className="account-menu"><div className="account-identity"><span className="avatar">{me.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</span><div><b>{me.name}</b><small>{account.email}</small></div></div><button className="account-action" disabled={busy} onClick={()=>void signOut()}><LogOut size={16}/>Sign out</button></div></aside><div className="main-shell"><header className="topbar"><div className="breadcrumbs">{employer?'Talent workspace':NAV.find(n=>n.id===view)?.description}</div><div className="topbar-actions">{account.mode==='mock'&&<span className="pill">Offline preview</span>}<ThemeToggle/><button className="mobile-signout icon-button" aria-label="Sign out" disabled={busy} onClick={()=>void signOut()}><LogOut size={18}/></button></div></header>{error&&<div className="global-alert" role="alert"><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}{busy&&<div className="activity-banner" role="status">Preparing your next step…</div>}{loading?<div className="loading">Loading your workspace…</div>:<div className={`content-layout ${view==='chat'?'chat-layout':''}`}><main>{view==='chat'?<div className="chat-home">{!employer&&data&&<div className="chat-goal"><div><span className="eyebrow">YOUR DIRECTION</span><h1>{me.target_role}</h1><p>{GOALS[me.career_goal]} · {data.skills.filter(s=>s.passed).length} foundational skills</p></div><button className="text-button" disabled={busy} onClick={()=>setView('learning')}>View my roadmap<ArrowRight size={15}/></button></div>}<Chat key={`${me.id}-${chatVersion}`} role={me.role} mode={account.mode} onResult={onChat}/>{!employer&&plan?.activity&&<button disabled={busy} className="resume-strip" onClick={continueLearning}><BookOpen size={17}/><span>Continue where you left off<b>{plan.activity.title||skillLabel(plan.activity.skill)}</b></span><ArrowRight size={17}/></button>}</div>:employer?<EmployerDashboard key={me.id} onError={setError}/>:data&&plan&&passport?view==='profile'?<ProfilePage key={me.id} data={data} busy={busy} onSave={saveProfile} onEvaluate={()=>void evaluate()} onPassport={()=>setView('assessments')}/>:view==='learning'?<LearningPage plan={plan} busy={busy} onExpand={s=>void expand(s)} onLesson={t=>void openTopic(t)} onAssess={t=>void assess(t.skill,t.id)} onContinue={continueLearning}/>:view==='assessments'?<PassportPage passport={passport} data={data} busy={busy} onNext={()=>void nextAssessment()} onResume={setAttempt} onAssess={s=>void assess(s)}/>:<Marketplace matches={matches} student={me.candidate_track==='student'}/>:<div className="empty"><p>We couldn’t load your workspace.</p><button className="button" onClick={()=>void authenticated(account)}>Try again</button></div>}</main></div>}</div>{attempt&&<Assessment key={attempt.id} attempt={attempt} onClose={()=>setAttempt(null)} onSaved={refresh}/>} {lesson&&<Modal title={lesson.title} onClose={()=>setLesson(null)}><span className="pill">{lesson.competency_id?'Competency lesson':'Skill lesson'}</span><h3 className="lesson-section-title">Concept</h3><p className="lesson-content">{lesson.content}</p>{lesson.examples?.length>0&&<><h3 className="lesson-section-title">Worked examples</h3>{lesson.examples.map((example,i)=><pre className="lesson-example" key={i}>{example}</pre>)}</>}{lesson.key_takeaways?.length>0&&<><h3 className="lesson-section-title">Key takeaways</h3><ul className="lesson-takeaways">{lesson.key_takeaways.map((s,i)=><li key={i}>{s}</li>)}</ul></>}<div className="exercise"><h3>Practice</h3><p>{lesson.exercise}</p><p className="muted text-sm">Practice locally or on paper. The next objective check records evidence of understanding.</p></div><button className="button primary wide" disabled={busy} onClick={()=>void completeLesson()}>I’ve practiced · Start assessment<ArrowRight size={16}/></button></Modal>}</div>
 }

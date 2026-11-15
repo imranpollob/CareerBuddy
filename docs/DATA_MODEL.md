@@ -9,6 +9,13 @@ One table, `SkillPilot`, with string keys `PK` and `SK`. Every item has a `data`
 | Assessment | `USER#<id>` | `ASSESSMENT#<attempt-id>` | Get owned attempt; query attempt history |
 | Private answer key | `USER#<id>` | `ASSESSMENT_KEY#<attempt-id>` | Server-side grading only; excluded from API/history queries |
 | Adaptive interview | `USER#<id>` | `ONBOARDING#active` | Resume private conversation, claims, and revision-guarded confirmation |
+| Career path | `USER#<id>` | `CAREER_PATH#active` | Save career goal and six focus skills; preserve opened paths as market demand changes |
+| Skill competencies | `USER#<id>` | `PATH#<skill>` | Three generated objectives and a revision used to guard concurrent grading |
+| Competency evidence | `USER#<id>` | `COMPETENCY#<skill>:<number>` | Latest objective-check result for a narrow topic |
+| Competency lesson | `USER#<id>` | `COMPETENCY_CONTENT#<id>` | Private structured explanation, examples, takeaways and practice |
+| Competency practice | `USER#<id>` | `PRACTICE#<id>` | Practice marker, not assessed evidence |
+| Last activity | `USER#<id>` | `ACTIVITY#active` | Resume a lesson or pending assessment |
+| Conversation | `USER#<id>` | `CHAT#active` | Revision-guarded private text history, bounded to 24 messages |
 | Generated lesson | `USER#<id>` | `CONTENT#<skill>` | Cache personalized lesson and exercise |
 | Roadmap | `USER#<id>` | `ROADMAP#active` | Get/replace compact derived learning plan |
 | Lesson progress | `USER#<id>` | `LESSON#<skill>` | Record that the candidate practiced the lesson |
@@ -46,3 +53,7 @@ The backend's Pydantic contracts are in `backend/models.py`; frontend response i
 | `POST /api/chat` | Authenticated | Orchestrator response and actual specialist/tool delegation results |
 | `GET /api/jobs`, `GET /api/market` | Authenticated | Sample postings and deterministic skill frequencies |
 
+
+CareerBuddy adds `career_goal` (`stay_relevant`, `find_job`, `switch_careers`) to profiles. Skill evidence has server-derived mastery and optional supporting competency/assessment IDs. Passing a narrow topic writes only competency evidence. All three topic passes are needed to support the broader skill; a later failed competency invalidates that aggregate. Path revision and pending-attempt conditions guard these writes in one transaction. Standalone skill checks remain available. Quizzes award at most Foundational, never Applied or Demonstrated.
+
+Additional owner-scoped candidate endpoints: `GET /api/learning`, `POST /api/learning/{skill}/expand`, `GET /api/competencies/{id}/lesson`, `POST /api/competencies/{id}/practice`, `POST /api/assessments/next`, and `GET /api/passport`. `POST /api/assessments` accepts an optional owned `competency_id`; mismatched skill/topic pairs are rejected. `GET /api/chat/history` is available to both roles and returns only their own conversation text and specialist names.

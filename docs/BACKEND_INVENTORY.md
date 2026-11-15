@@ -1,4 +1,4 @@
-# Backend inventory
+# CareerBuddy backend inventory
 
 ## Five real Strands agents
 
@@ -40,3 +40,5 @@ Structured authoring reuses the same five role definitions: the orchestrator int
 These are application data and fixed learning content, not a model-training dataset. New signups, employer-created jobs, assessment attempts, roadmaps, and matches are runtime records and increase independently of the bundled counts.
 
 Source files: `backend/data/jobs.json`, `backend/data/demo_profiles.json`, `backend/tools/assessments.py`, and `backend/tools/jobs.py`.
+
+CareerBuddy adds persisted private chat history, one saved career path, generated three-topic competency breakdowns, structured lessons, competency evidence and a Skill Passport. These are workflow operations using the same five Strands roles and nine custom tools, not additional agents. Scheduled learning reminders and practical coding/project mastery levels remain later scope.

@@ -22,6 +22,8 @@ class Service:
         if settings is not None:
             from backend.intelligence import Intelligence
             self.intelligence = Intelligence(settings)
+        from backend.learning import Learning
+        self.learning=Learning(self)
 
     def catalog(self, uid=None):
         result=dict(SKILLS)
@@ -85,11 +87,14 @@ class Service:
             raise ValueError("Assessment not found")
         return value
 
-    def create_assessment(self, uid, skill, *, fixed=False):
+    def create_assessment(self, uid, skill, *, fixed=False, competency_id=None):
         skill=normalize_skills([skill])[0]
+        competency=self.learning.competency(uid,competency_id) if competency_id else None
+        if competency and competency["skill"]!=skill:
+            raise ValueError("Assessment skill does not match the competency")
         # Reuse an unsubmitted attempt, including if an agent retries a tool call.
         for existing in self.repo.partition(f"USER#{uid}", "ASSESSMENT#"):
-            if existing["skill"] == skill and existing["status"] == "pending":
+            if existing["skill"] == skill and existing.get("competency_id")==competency_id and existing["status"] == "pending":
                 return existing
         aid=uuid4().hex
         data={"id":aid,"skill":skill,"status":"pending","created_at":now()}
@@ -99,6 +104,9 @@ class Service:
             prior=[q["prompt"] for a in self.repo.partition(f"USER#{uid}","ASSESSMENT#") if a["skill"]==skill for q in a["questions"]][-12:]
             context={"claimed_skill_evidence":interview.get("claims",[]),"prior_question_prompts":prior,
                      "latest_assessed_skills":self.skills(uid),"market_requirements":self.market(uid)["requirements"][:5]}
+            if competency:
+                context["target_competency"]=competency
+                data.update(competency_id=competency_id,competency_title=competency["title"])
             generated=self.intelligence.assessment(self.profile(uid),skill,context)
             data.update(questions=[q.model_dump(exclude={"correct_index","explanation"}) for q in generated.questions],
                         kind="llm_generated_v1" if self.intelligence.settings.ai_mode=="bedrock" else "mock_generated_v1",
@@ -112,6 +120,8 @@ class Service:
             data.update(questions=public_questions(skill),kind="fixed_fundamentals_v1")
         writes.append(item(f"USER#{uid}",f"ASSESSMENT#{aid}",data))
         self.repo.write(writes)
+        if not fixed:
+            self.learning.activity(uid,{"kind":"assessment","assessment_id":aid,"skill":skill,"competency_id":competency_id,"title":data.get("competency_title",skill_label(skill))})
         return data
 
     def submit(self, uid, aid, answers, *, seeded=False):
@@ -132,11 +142,35 @@ class Service:
         else:
             result = grade(data["skill"], answers)
         data.update(status="completed", answers=answers, result=result, completed_at=now())
+        if data.get("competency_id"):
+            result["scope"]=f"Four-question competency knowledge check: {data['competency_title']}; limited foundational evidence, not certification"
         evidence = {"skill": data["skill"], "assessment_id": aid, "score": result["score"],
                     "passed": result["passed"], "assessed_at": data["completed_at"], "scope": result["scope"],
                     "synthetic": seeded}
+        evidence["mastery"]="foundational" if result["passed"] else "not_assessed"
         pk, sk = f"USER#{uid}", f"ASSESSMENT#{aid}"
-        self.repo.write([item(pk, sk, data), item(pk, f"SKILL#{data['skill']}", evidence)], pending=(pk, sk))
+        writes=[item(pk,sk,data)]
+        revision_guard=None
+        if data.get("competency_id"):
+            cid=data["competency_id"]
+            topic={**evidence,"id":cid,"title":data["competency_title"],"assessment_format":"objective_knowledge_check"}
+            writes.append(item(pk,f"COMPETENCY#{cid}",topic))
+            path=self.repo.get(pk,f"PATH#{data['skill']}")
+            revision_guard=(pk,f"PATH#{data['skill']}",path["revision"])
+            writes.append(item(pk,f"PATH#{data['skill']}",{**path,"revision":path["revision"]+1}))
+            topic_evidence=[topic if c["id"]==cid else self.repo.get(pk,f"COMPETENCY#{c['id']}") for c in path["competencies"]]
+            complete=all(e and e["passed"] for e in topic_evidence)
+            previous=self.repo.get(pk,f"SKILL#{data['skill']}") or {}
+            if complete or previous.get("competency_ids"):
+                evidence.update(score=min((e["score"] if e else 0) for e in topic_evidence),passed=complete,
+                                mastery="foundational" if complete else "not_assessed",
+                                competency_ids=[c["id"] for c in path["competencies"]],
+                                assessment_ids=[e["assessment_id"] for e in topic_evidence if e],
+                                scope="Three competency knowledge checks; foundational evidence, not practical certification")
+                writes.append(item(pk,f"SKILL#{data['skill']}",evidence))
+        else:
+            writes.append(item(pk,f"SKILL#{data['skill']}",evidence))
+        self.repo.write(writes, pending=(pk, sk),expected_revision=revision_guard)
         return data
 
     def roadmap(self, uid):
@@ -169,12 +203,14 @@ class Service:
         elif self.intelligence:
             generated=self.intelligence.lesson(self.profile(uid),skill,[s for s in self.skills(uid) if s["skill"]==skill])
             title,content,exercise=generated.title,generated.content,generated.exercise
-            self.repo.write([item(f"USER#{uid}",f"CONTENT#{skill}",generated.model_dump())])
+            cached=generated.model_dump()
+            self.repo.write([item(f"USER#{uid}",f"CONTENT#{skill}",cached)])
         elif skill in LESSONS:
             title, content, exercise = LESSONS[skill]
         else:
             raise ValueError("An AI model is required for this lesson topic")
         return {"skill": skill, "title": title, "content": content, "exercise": exercise,
+                "examples":(cached or {}).get("examples",[]),"key_takeaways":(cached or {}).get("key_takeaways",[]),
                 "completed": bool(self.repo.get(f"USER#{uid}", f"LESSON#{skill}"))}
 
     def complete_lesson(self, uid, skill):
@@ -229,6 +265,8 @@ class Service:
                 self.repo.write([item(pk, "PROFILE", profile.model_dump())])
             elif "candidate_track" not in existing:
                 self.repo.write([item(pk, "PROFILE", {**existing, "candidate_track": profile.candidate_track})])
+            if existing and "career_goal" not in existing:
+                self.repo.write([item(pk,"PROFILE",{**self.repo.get(pk,"PROFILE"),"career_goal":profile.career_goal})])
             for skill, target_score in fixture.get("seed_scores", {}).items():
                 if self.repo.get(pk, f"SKILL#{skill}"):
                     continue

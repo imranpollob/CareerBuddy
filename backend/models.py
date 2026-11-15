@@ -33,6 +33,7 @@ class ProfileUpdate(Contract):
     target_role: str = Field(min_length=1, max_length=120)
     claimed_skills: list[str] = Field(max_length=20)
     marketplace_opt_in: bool = False
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
 
     @field_validator("claimed_skills")
     @classmethod
@@ -86,6 +87,7 @@ class Job(JobCreate):
 
 class AssessmentCreate(Contract):
     skill: str = Field(default="python", max_length=50)
+    competency_id: str | None = Field(default=None, max_length=80)
 
 
 class Submission(Contract):
@@ -127,12 +129,22 @@ class SkillEvidence(Contract):
     assessed_at: str
     scope: str
     synthetic: bool
+    mastery: Literal["not_assessed", "foundational", "applied", "demonstrated"] = "foundational"
+    competency_ids: list[str] = Field(default_factory=list)
+    assessment_ids: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def mastery_requires_passing_evidence(self):
+        if not self.passed:
+            self.mastery="not_assessed"
+        return self
 
 
 class Question(Contract):
     id: str
     prompt: str
     choices: list[str]
+    format: Literal["knowledge", "scenario"] = "knowledge"
 
 
 class Feedback(Contract):
@@ -157,6 +169,8 @@ class AssessmentRecord(Contract):
     kind: str
     generation_model: str | None = None
     personalized_context: str | None = None
+    competency_id: str | None = None
+    competency_title: str | None = None
     answers: dict[str, int] | None = None
     result: AssessmentResult | None = None
     completed_at: str | None = None
@@ -185,6 +199,9 @@ class LessonRecord(Contract):
     content: str
     exercise: str
     completed: bool
+    examples: list[str] = Field(default_factory=list)
+    key_takeaways: list[str] = Field(default_factory=list)
+    competency_id: str | None = None
 
 
 class RequirementSource(Contract):
@@ -283,6 +300,7 @@ class OnboardingTurn(Contract):
     candidate_track: Literal["career_switcher", "student", "experienced"]
     claims: list[SkillClaim] = Field(default_factory=list, max_length=20)
     ready_to_review: bool
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
 
 
 class OnboardingAnswer(Contract):
@@ -304,6 +322,7 @@ class OnboardingState(Contract):
     current_role: str
     target_role: str
     candidate_track: str
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
 
 
 class GeneratedQuestion(Question):
@@ -347,3 +366,73 @@ class GeneratedLesson(Contract):
     title: str = Field(min_length=5, max_length=120)
     content: str = Field(min_length=50, max_length=5000)
     exercise: str = Field(min_length=20, max_length=1500)
+    examples: list[str] = Field(min_length=1, max_length=3, description="One to three worked examples, each a string")
+    key_takeaways: list[str] = Field(min_length=1, max_length=5, description="One to five concise takeaways, each a string; never null")
+
+
+class CompetencyDefinition(Contract):
+    title: str = Field(min_length=5, max_length=100)
+    objective: str = Field(min_length=15, max_length=400)
+    format: Literal["knowledge", "scenario"]
+
+
+class GeneratedSkillPath(Contract):
+    skill: str
+    rationale: str = Field(min_length=15, max_length=500)
+    competencies: list[CompetencyDefinition] = Field(min_length=3, max_length=3)
+
+    @model_validator(mode="after")
+    def distinct_topics(self):
+        if len({c.title.casefold() for c in self.competencies}) != 3:
+            raise ValueError("Competency titles must be distinct")
+        return self
+
+
+class ConversationMessage(Contract):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=12000)
+    created_at: str
+    specialists: list[str] = Field(default_factory=list)
+
+
+class ConversationRecord(Contract):
+    revision: int = 0
+    messages: list[ConversationMessage] = Field(default_factory=list, max_length=24)
+
+
+class LearningTopic(CompetencyDefinition):
+    id: str
+    skill: str
+    status: Literal["available", "current", "completed", "practice_needed"]
+    lesson_completed: bool
+    evidence: dict | None = None
+
+
+class LearningSkill(Contract):
+    skill: str
+    label: str
+    job_count: int
+    rationale: str
+    expanded: bool
+    topics: list[LearningTopic]
+    mastery: Literal["not_assessed", "foundational", "applied", "demonstrated"]
+
+
+class LearningRecord(Contract):
+    target_role: str
+    career_goal: str
+    skills: list[LearningSkill]
+    next_topic: LearningTopic | None
+    activity: dict | None
+    completed_topics: int
+    total_topics: int
+    note: str
+
+
+class PassportRecord(Contract):
+    skills: list[SkillEvidence]
+    competencies: list[dict]
+    assessments: list[AssessmentRecord]
+    strengths: list[str]
+    next_steps: list[str]
+    note: str

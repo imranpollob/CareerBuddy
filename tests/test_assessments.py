@@ -21,7 +21,7 @@ def test_invalid_answers_rejected(answers):
 def test_no_answer_keys_in_pending_attempt(candidate):
     data=candidate.post("/api/assessments",json={"skill":"python"}).json()
     assert data["status"] == "pending"
-    assert all(set(q)=={"id","prompt","choices"} for q in data["questions"])
+    assert all(set(q)=={"id","prompt","choices","format"} for q in data["questions"])
     assert "result" not in data
 
 
