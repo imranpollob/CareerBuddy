@@ -1,6 +1,6 @@
 """One saved career path, with private competency content and derived evidence."""
 from backend.db import item, Conflict
-from backend.tools.jobs import normalize_skills, skill_label, requirements
+from backend.tools.jobs import normalize_skills, skill_label, requirements, jobs_for_role
 from backend.models import LearningRecord, PassportRecord, SkillEvidence
 
 
@@ -8,10 +8,14 @@ class Learning:
     def __init__(self,service):
         self.service,self.repo=service,service.repo
 
+    def role_jobs(self,saved):
+        # Live, so postings added after the evaluation (e.g. by employers) are included.
+        return jobs_for_role(self.service.jobs(),saved['goal']['target_role'])
+
     def requirements(self,uid):
         saved=self.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}
         if 'market_job_ids' not in saved:return self.service.market(uid)['requirements']
-        return requirements([j for j in self.service.jobs() if j['id'] in saved['market_job_ids']])
+        return requirements(self.role_jobs(saved))
 
     def plan(self,uid,*,preview=False):
         profile=self.service.profile(uid)
@@ -38,6 +42,7 @@ class Learning:
                 saved={**saved,"focus_skills":focus}
                 if not preview:self.repo.write([item(pk,"CAREER_PATH#active",saved)])
         frequencies={r["skill"]:r["job_count"] for r in market}
+        labels=self.service.catalog(uid)  # same labels the UI uses elsewhere
         evidence={e["skill"]:e for e in self.service.skills(uid)}
         skills=[]
         next_topic=None
@@ -54,11 +59,12 @@ class Learning:
                     topic["status"]="current" if not result else "practice_needed"
                     next_topic=topic
                 topics.append(topic)
-            skills.append({"skill":skill,"label":skill_label(skill),"job_count":frequencies.get(skill,0),
-                           "rationale":path["rationale"] if path else "Explore focused competencies connected to this career goal.",
+            skills.append({"skill":skill,"label":labels.get(skill) or skill_label(skill),"job_count":frequencies.get(skill,0),
+                           "rationale":path["rationale"] if path else "Build this skill's three-step path when you're ready to start it.",
                            "expanded":path is not None,"topics":topics,
                            "mastery":"foundational" if evidence.get(skill,{}).get("passed") else "not_assessed"})
-        return LearningRecord(market_role_covered=saved.get("market_role_covered",False),evaluation_id=saved.get("evaluation_id"),summary=saved.get("summary"),target_role=saved["goal"]["target_role"],career_goal=saved["goal"]["career_goal"],skills=skills,next_topic=next_topic,
+        role_jobs=self.role_jobs(saved) if saved.get("evaluation_id") else []
+        return LearningRecord(market_role_covered=bool(role_jobs),role_job_ids=[j["id"] for j in role_jobs],evaluation_id=saved.get("evaluation_id"),summary=saved.get("summary"),target_role=saved["goal"]["target_role"],career_goal=saved["goal"]["career_goal"],skills=skills,next_topic=next_topic,
                               activity=(self.repo.get(pk,"ACTIVITY#active") or None),completed_topics=sum(t["status"]=="completed" for s in skills for t in s["topics"]),
                               total_topics=sum(len(s["topics"]) for s in skills),
                               note="Knowledge and scenario checks support foundational evidence. Applied and demonstrated levels require practical evidence and are not awarded by quizzes.").model_dump()

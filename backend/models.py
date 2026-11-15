@@ -6,6 +6,13 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def required_text(value, message):
+    value = value.strip()
+    if not value:
+        raise ValueError(message)
+    return value
+
+
 class LoginRequest(Contract):
     email: EmailStr = Field(max_length=254)
     password: SecretStr = Field(min_length=1, max_length=128)
@@ -26,6 +33,11 @@ class SignupRequest(LoginRequest):
         from backend.tools.jobs import normalize_skills
         return normalize_skills(values)
 
+    @field_validator("name")
+    @classmethod
+    def real_name(cls, value):
+        return required_text(value, "Enter your name.")
+
 
 class ProfileUpdate(Contract):
     name: str = Field(min_length=1, max_length=80)
@@ -40,6 +52,16 @@ class ProfileUpdate(Contract):
     def valid_skills(cls, values):
         from backend.tools.jobs import normalize_skills
         return normalize_skills(values)
+
+    @field_validator("name")
+    @classmethod
+    def real_name(cls, value):
+        return required_text(value, "Enter your name.")
+
+    @field_validator("current_role", "target_role")
+    @classmethod
+    def trimmed(cls, value):
+        return value.strip()
 
 
 class Profile(ProfileUpdate):
@@ -273,6 +295,17 @@ class Journey(Contract):
     target_levels: list[str]
 
 
+def readable_skill_label(skill, label):
+    """Keep a generated label only when it actually names the skill."""
+    from backend.tools.jobs import canonical_skill, skill_label
+    try:
+        if canonical_skill(label) == skill:
+            return label
+    except ValueError:
+        pass
+    return skill_label(skill)
+
+
 class SkillTag(Contract):
     skill: str = Field(min_length=2, max_length=64)
     label: str = Field(min_length=2, max_length=80)
@@ -282,8 +315,8 @@ class SkillTag(Contract):
     @field_validator("skill")
     @classmethod
     def normalize(cls, value):
-        from backend.tools.jobs import normalize_skills
-        return normalize_skills([value])[0]
+        from backend.tools.jobs import canonical_skill
+        return canonical_skill(value)
 
 
 class SkillClaim(Contract):
@@ -294,8 +327,14 @@ class SkillClaim(Contract):
     @field_validator("skill")
     @classmethod
     def normalize(cls, value):
-        from backend.tools.jobs import normalize_skills
-        return normalize_skills([value])[0]
+        from backend.tools.jobs import canonical_skill
+        return canonical_skill(value)
+
+    @model_validator(mode="after")
+    def readable_label(self):
+        # Models sometimes put the claim type ("used in project") in label.
+        self.label = readable_skill_label(self.skill, self.label)
+        return self
 
 
 class OnboardingTurn(Contract):
@@ -430,6 +469,7 @@ class LearningSkill(Contract):
 
 class LearningRecord(Contract):
     market_role_covered: bool = False
+    role_job_ids: list[str] = Field(default_factory=list)
     evaluation_id: str | None = None
     summary: str | None = None
     target_role: str
@@ -459,10 +499,10 @@ class GeneratedRoadmap(Contract):
     @field_validator('focus_skills')
     @classmethod
     def valid_focus_skills(cls, values):
-        from backend.tools.jobs import normalize_skills
-        normalized=normalize_skills(values)
-        if len(normalized)!=len(values):raise ValueError('Choose distinct learning skills')
-        return normalized
+        # Canonical IDs keep roadmap evidence comparable with job requirements;
+        # variants of one skill collapse instead of failing the whole generation.
+        from backend.tools.jobs import canonical_skills
+        return canonical_skills(values)
 
     focus_skills: list[str] = Field(min_length=1, max_length=6)
     summary: str = Field(min_length=10, max_length=1000)

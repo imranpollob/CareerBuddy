@@ -28,13 +28,16 @@ class Service:
 
     def catalog(self, uid=None):
         result=dict(SKILLS)
+        def readable(skill,label):
+            # Generated labels are sometimes all-lowercase ("accessibility"); never show those.
+            return label if label and label!=label.lower() else skill_label(skill)
         for job in self.jobs():
             for tag in job.get("skill_tags",[]):
-                result.setdefault(tag["skill"],tag["label"])
+                result.setdefault(tag["skill"],readable(tag["skill"],tag["label"]))
         if uid:
             interview=self.repo.get(f"USER#{uid}","LEARNING_EVALUATION#active") or self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
             for claim in interview.get("claims",[]):
-                result.setdefault(claim["skill"],claim["label"])
+                result.setdefault(claim["skill"],readable(claim["skill"],claim["label"]))
         return result
 
     def profile(self, uid):

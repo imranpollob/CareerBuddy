@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from botocore.exceptions import BotoCoreError, ClientError
+from pydantic import ValidationError
 
 from backend.config import Settings
 from backend.db import MemoryRepository, DynamoRepository, Conflict
@@ -68,6 +69,13 @@ def create_app(repo=None, settings=None):
 
     @app.exception_handler(ValueError)
     async def bad_input(request, exc):
+        if isinstance(exc, ValidationError):
+            # Never leak Pydantic internals (model names, input echoes, docs URLs) to users.
+            logging.getLogger(__name__).warning("Validation failed: %s", exc.title)
+            issue = exc.errors()[0] if exc.errors() else {}
+            field = " ".join(str(p) for p in issue.get("loc", ()) if p != "body").replace("_", " ")
+            message = str(issue.get("msg", "is invalid")).removeprefix("Value error, ")
+            return JSONResponse(status_code=400, content={"detail": f"{field.capitalize()}: {message}" if field else message})
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.exception_handler(PermissionError)

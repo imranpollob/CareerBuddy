@@ -286,3 +286,8 @@
   .level-filter { align-items: flex-start; flex-direction: column; }
   .level-filter select { width: 100%; max-width: none; }
 }
+
+/* Profile background (read-only onboarding answers) and assessment feedback context */
+.profile-background{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:8px 0 0}
+.profile-background dd{margin:2px 0 0;font-weight:600}
+.feedback-question{font-weight:500;margin:6px 0 2px}

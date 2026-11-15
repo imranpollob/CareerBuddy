@@ -13,6 +13,18 @@ ALIASES = {"python3": "python", "python 3": "python", "torch": "pytorch", "bedro
            "large language models": "llm", "retrieval augmented generation": "rag",
            "retrieval-augmented generation": "rag", "evals": "evaluation", "c++": "cpp", "c#": "csharp",
            "ml": "machine_learning", "machine learning": "machine_learning", "postgres": "postgresql"}
+# Model-generated IDs drift ("web_performance_optimization" vs "performance_optimization").
+# Matching compares canonical IDs so assessment evidence lines up with job requirements.
+CANONICAL_ALIASES = {"web_performance": "performance_optimization", "frontend_performance": "performance_optimization",
+                     "performance_tuning": "performance_optimization", "web_performance_optimization": "performance_optimization",
+                     "a11y": "accessibility", "wcag": "accessibility", "web_accessibility": "accessibility",
+                     "playwright_testing": "playwright", "playwright_e2e": "playwright", "playwright_e2e_testing": "playwright",
+                     "end_to_end_testing": "e2e_testing", "e2e_tests": "e2e_testing", "jest_testing": "jest",
+                     "reactjs": "react", "react_js": "react", "react.js": "react", "nodejs": "node_js", "node.js": "node_js",
+                     "node": "node_js", "ts": "typescript", "js": "javascript", "large_language_models": "llm",
+                     "retrieval_augmented_generation": "rag", "amazon_bedrock": "aws", "amazon_web_services": "aws"}
+QUALIFIER_PREFIXES = ("web_", "frontend_", "front_end_", "backend_", "modern_", "advanced_", "basic_", "core_")
+QUALIFIER_SUFFIXES = ("_framework", "_library", "_programming", "_language", "_fundamentals", "_basics", "_concepts", "_skills")
 
 
 def normalize_skills(values):
@@ -25,6 +37,28 @@ def normalize_skills(values):
         if key not in result:
             result.append(key)
     return result
+
+
+def canonical_skill(skill):
+    """Collapse qualifier/alias variants of a skill ID onto one canonical ID."""
+    key = normalize_skills([skill])[0]
+    key = CANONICAL_ALIASES.get(key, key)
+    known = set(SKILLS) | set(ALIASES.values()) | set(CANONICAL_ALIASES.values())
+    if key in known:
+        return key
+    for prefix in QUALIFIER_PREFIXES:
+        stem = CANONICAL_ALIASES.get(key[len(prefix):], key[len(prefix):])
+        if key.startswith(prefix) and stem in known:
+            return stem
+    for suffix in QUALIFIER_SUFFIXES:
+        stem = CANONICAL_ALIASES.get(key[:-len(suffix)], key[:-len(suffix)])
+        if key.endswith(suffix) and stem in known:
+            return stem
+    return key
+
+
+def canonical_skills(values):
+    return list(dict.fromkeys(canonical_skill(v) for v in values))
 
 
 def skill_label(skill):

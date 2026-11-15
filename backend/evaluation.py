@@ -21,7 +21,8 @@ class Evaluation:
         if existing and existing['status']!='completed' and existing.get('flow_version')==4:return existing
         profile=self.service.profile(uid)
         # Resume only interviews that collected explicit goals; old questions may contain defaults.
-        question='What role would you like to work toward, and which skills or projects would you like us to consider?'
+        # Target role and purpose have their own fields; the free-text question covers the rest.
+        question='Which skills, tools, or projects should we consider, and what would you most like to learn next?'
         state=LearningEvaluation(flow_version=4,id=uuid4().hex,revision=existing['revision']+1 if existing else 0,
             status='interview',mode=self.service.intelligence.settings.ai_mode,question=question,
             question_number=1,total_questions=3,messages=[{'role':'assistant','content':question}],claims=[],

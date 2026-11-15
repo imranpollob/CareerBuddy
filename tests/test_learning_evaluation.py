@@ -164,4 +164,32 @@ def test_general_roadmap_still_validates_skill_ids():
     from backend.models import GeneratedRoadmap
     from pydantic import ValidationError
     with pytest.raises(ValidationError):GeneratedRoadmap(focus_skills=['../arbitrary-path'],summary='A sufficiently long explanation.')
-    with pytest.raises(ValidationError):GeneratedRoadmap(focus_skills=['Editing','editing'],summary='A sufficiently long explanation.')
+    # Duplicates and qualifier variants collapse to one canonical skill instead of failing generation.
+    assert GeneratedRoadmap(focus_skills=['Editing','editing'],summary='A sufficiently long explanation.').focus_skills==['editing']
+    assert GeneratedRoadmap(focus_skills=['performance_optimization','web_performance_optimization'],summary='A sufficiently long explanation.').focus_skills==['performance_optimization']
+
+
+def test_job_evidence_matches_skill_id_variants():
+    from backend.tools.matching import match
+    from backend.tools.jobs import canonical_skill
+    assert canonical_skill('web_performance_optimization')=='performance_optimization'
+    assert canonical_skill('playwright_testing')==canonical_skill('playwright')=='playwright'
+    assert canonical_skill('python_testing')=='python_testing'  # unrelated compounds stay distinct
+    job={'required_skills':['web_performance_optimization','playwright','react'],'synthetic':False}
+    evidence=[{'skill':'performance_optimization','passed':True},{'skill':'playwright_testing','passed':True}]
+    result=match(job,evidence)
+    assert result['supported']==['web_performance_optimization','playwright'] and result['missing']==['react']
+    assert 'Still to demonstrate: React.' in result['explanation']
+
+
+def test_claim_label_names_the_skill():
+    from backend.models import SkillClaim
+    claim=SkillClaim(skill='react',label='used in project',evidence_excerpt='I built it in React')
+    assert claim.label=='React'
+    assert SkillClaim(skill='storybook',label='Storybook',evidence_excerpt='with Storybook').label=='Storybook'
+
+
+def test_blank_signup_name_is_a_clear_error(client):
+    response=client.post('/api/auth/signup',json={'name':'   ','email':'blank@example.com','password':'long-enough-pw','role':'candidate'})
+    assert response.status_code==422
+    assert 'pydantic' not in response.text and 'Enter your name.' in response.text
