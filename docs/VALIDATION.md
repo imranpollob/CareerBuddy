@@ -17,7 +17,7 @@ Validated locally with explicit mock tests plus separate actual Bedrock/DynamoDB
 | Live Bedrock flow | Actual adaptive interview → confirmed skills → personalized Python assessment → server grading/persisted evidence → generated FastAPI lesson → Coach delegation reading the new evidence |
 | Offline AI | Explicitly labeled fixtures; actual Strands agent/tool loops remain in use |
 | Backend checks | 64 pytest tests passed; covers routing, scoring, persistence, matching, authentication, consent, generation failure and claim/tag grounding |
-| Browser checks | Four full-flow tests at desktop and iPhone sizes; adaptive signup plus assessment → learning → reassessment → marketplace/employer flow |
+| Browser checks | Six browser tests at desktop and iPhone sizes; adaptive signup plus assessment → learning → reassessment → marketplace/employer flow |
 | Frontend build | TypeScript and Vite production build passed |
 | AgentCore preparation | Local runtime entrypoint previously tested; image recipe prepared, nothing deployed |
 
@@ -39,3 +39,5 @@ MVP boundaries:
 Use the README commands to rerun verification, especially when temporary credentials change. No AWS resources have been created.
 
 CareerBuddy validation also covers career-purpose updates, saved visual paths, generated competencies, private structured lessons, narrow-topic grading, all-three-topic aggregation, failed reassessment invalidation, concurrent submissions, persistent chat across login/API restart, and memory/DynamoDB repository parity. The live Nova competency check passed path generation, explanation/examples/takeaways/practice, assessment generation with private keys, persisted partial evidence, Coach delegation and text history. Its temporary profile was removed.
+
+The interface now uses a Linear-inspired dark default theme with a light alternative, locally bundled Inter/JetBrains Mono fonts, and sidebar account controls instead of a top bar. Chat and lessons render Markdown. Browser checks cover semantic headings/lists/tables, code copying, rejection of unsafe links/raw HTML/images, visible pending-generation loaders, error recovery and reduced-motion behavior. Loader messages rotate without presenting fabricated percentages.

@@ -63,7 +63,7 @@ The app opens on email/password sign-in. Signup asks only for name, email, passw
 
 Three actor accounts are precreated: **Alex Morgan** (`alex@example.com`), **Priya Shah** (`priya@example.com`), and **Jordan Lee** (`jordan@example.com`). Their random initial passwords are stored privately in ignored `.local/actor-accounts.json` after the first backend startup. Open that file locally; do not commit or publish it. These accounts use the same login form as everyone else. The former demo identity selector and passwordless demo endpoints have been removed.
 
-Candidates land on **AI Chat**, with private conversation history and suggestions for their next step. The sidebar opens **My Profile**, **Learning**, **Assessments**, and **Jobs**. Learning contains one saved visual career roadmap, generated competencies and lessons; Assessments contains the Skill Passport and attempt history. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
+Candidates land on **AI Chat**, with private conversation history and suggestions for their next step. The sidebar opens **My Profile**, **Learning**, **Assessments**, and **Jobs**. The interface uses a dark Linear-inspired theme (with a light alternative), rendered Markdown and animated generation feedback. Learning contains one saved visual career roadmap, generated competencies and lessons; Assessments contains the Skill Passport and attempt history. Sign out before signing into another actor's account. See [authentication](docs/AUTHENTICATION.md), [the presenter guide](docs/DEMO_GUIDE.md), and the exact [backend inventory](docs/BACKEND_INVENTORY.md).
 
 ## Tests
 
