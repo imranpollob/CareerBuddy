@@ -33,6 +33,6 @@ The agents-as-tools architecture remains: five agent roles and nine custom tools
 
 ## CareerBuddy roadmap and passport
 
-Candidates now land on persistent AI Chat. Profile, Learning, Assessments and Jobs have separate navigation. A saved six-skill career path is built from current sampled requirements; opened paths remain stable while unstarted focus slots can adapt to demand. Each expanded skill receives three generated competencies. Lessons and objective assessments target those objectives, and last activity is saved for continuation.
+Candidates now land on Home, which displays saved progress and one actionable next step without a model call. AI Chat is a separate conversation page. Learning, Assessments and Jobs have dedicated navigation; My Profile is by the account controls. A saved six-skill career path is built from current sampled requirements; opened paths remain stable while unstarted focus slots can adapt to demand. Each expanded skill receives three generated competencies. Lessons and objective assessments target those objectives, and last activity is saved for continuation.
 
 Competency evidence stays separate from whole-skill evidence. All three passes support a Foundational aggregate; a later failed competency invalidates that aggregate. Revision guards prevent concurrent topic submissions from losing aggregate progress. The Skill Passport exposes dates, scope, assessment references and feedback, while Applied and Demonstrated remain later practical-assessment levels. See [CareerBuddy status](CAREERBUDDY_IMPLEMENTATION.md).

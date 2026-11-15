@@ -4,7 +4,8 @@ The supplied [feature plan](CAREERBUDDY_FEATURES.md) is preserved. CareerBuddy i
 
 | Plan priority | Delivered behavior |
 | --- | --- |
-| AI chat / orchestrator | Candidate landing page; four suggested actions; selective real Strands delegation; private conversation history across login/restart |
+| Candidate Home | Default landing page; deterministic next step, roadmap/passport snapshots and three sourced opportunities; no inference on load |
+| AI chat / orchestrator | Dedicated conversation page; compact suggested actions; selective real Strands delegation; private conversation history across login/restart |
 | Profile and dream job | Current/target roles, three career purposes, adaptive onboarding, self-reported skills and opt-in |
 | Market analysis | 68 real, attributed, LLM-tagged public postings with required/preferred source excerpts |
 | Visual roadmap | One saved six-skill career path; refreshes unstarted focus slots from demand while preserving opened paths; interactive connected competency steps |
@@ -32,3 +33,5 @@ The sourced sample remains focused on AI engineering and related roles. Changing
 Use the README commands for pytest, TypeScript/Vite and browser tests. The browser flow covers chat persistence, generated competency paths, lessons, failure/retry, all-three-topic aggregation, passport, job matching, opt-in employer discovery and new-user onboarding at desktop/mobile sizes.
 
 With DynamoDB Local running, `uv run python -m scripts.career_path_smoke` verifies real Bedrock path/lesson/question generation, private answer keys, persisted competency evidence without overstating broad mastery, Coach delegation and saved conversation. It uses an opted-out temporary profile and removes only its own records in a finally block. Safe reports stay in ignored `.local/`.
+
+Home reuses the existing dashboard, learning, passport and match responses. It prioritizes pending assessments, then the last unfinished lesson, next competency and remaining focus skills. Browsing Home invokes no model. Featured jobs open their full posting details; students see the early-career sample when available. New users see honest empty evidence states. My Profile is beside the account controls, including a mobile shortcut.

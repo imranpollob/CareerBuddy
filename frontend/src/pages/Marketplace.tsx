@@ -3,9 +3,9 @@ import { ArrowUpRight, BriefcaseBusiness, Check, MapPin, Search } from 'lucide-r
 import { type Match, type Job, type CareerLevel, skillLabel, LEVELS } from '../api'
 import { Modal } from '../components/Modal'
 
-export function Marketplace({matches,student=false}: {matches: Match[];student?:boolean}) {
+export function Marketplace({matches,student=false,initialJob=null}: {matches: Match[];student?:boolean;initialJob?:Job|null}) {
   const [query,setQuery]=useState('')
-  const [selected,setSelected]=useState<Job|null>(null)
+  const [selected,setSelected]=useState<Job|null>(initialJob)
   const [level,setLevel]=useState<CareerLevel|'all'|'early'>(student?'early':'all')
   const filtered=matches.filter(m=>(level==='all' || (level==='early'?['entry','internship'].includes(m.job.career_level):m.job.career_level===level)) && `${m.job.title} ${m.job.company} ${m.job.required_skills.join(' ')}`.toLowerCase().includes(query.toLowerCase()))
   return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">OPPORTUNITIES</p><h1>Find your next opportunity.</h1><p className="muted">See how your demonstrated fundamentals align with each role.</p></div></div>

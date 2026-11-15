@@ -2,17 +2,25 @@ import {expect,test,type Page} from '@playwright/test'
 import {readFileSync} from 'node:fs'
 function credentials(actor:string){return JSON.parse(readFileSync(new URL('../../.local/test-actor-accounts.json',import.meta.url),'utf8'))[actor]}
 async function login(page:Page,actor:string){const account=credentials(actor);await page.getByLabel('Email address',{exact:true}).fill(account.email);await page.getByLabel('Password',{exact:true}).fill(account.password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('navigation',{name:'Main navigation'})).toBeVisible()}
-async function nav(page:Page,name:string){await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:new RegExp(`^${name}`)}).click()}
+async function nav(page:Page,name:string){if(name==='My Profile'){await page.getByRole('button',{name:'My Profile',exact:true}).click();return}await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:new RegExp(`^${name}`)}).click()}
 async function logout(page:Page){await page.getByRole('button',{name:'Sign out',exact:true}).filter({visible:true}).click();await expect(page.getByRole('heading',{name:'Sign in to CareerBuddy'})).toBeVisible()}
 async function grade(page:Page,answers:number[]){const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();for(const [i,choice] of answers.entries())await dialog.locator('fieldset').nth(i).getByRole('radio').nth(choice).check();await dialog.getByRole('button',{name:'Submit assessment'}).click();await expect(dialog.getByRole('button',{name:'Back to my workspace'})).toBeVisible()}
 
 test('chat, competency roadmap, passport, jobs and consenting employer evidence',async({page},testInfo)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+ const generationRequests:string[]=[];page.on('request',request=>{if(/\/api\/(chat$|assessments|competencies|learning\/[^/]+\/expand)/.test(request.url()))generationRequests.push(request.url())})
  await page.goto('/');await login(page,'candidate')
+ await expect(page.getByRole('heading',{name:'Good to see you, Alex.',exact:true})).toBeVisible()
+ expect(generationRequests).toEqual([])
+ await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Home',exact:true})).toHaveAttribute('aria-current','page')
+ await expect(page.locator('.home-job')).toHaveCount(3)
+ await page.screenshot({path:`../.local/careerbuddy-home-${testInfo.project.name}.png`,fullPage:true})
+ await nav(page,'AI Chat')
+ await expect(page.locator('.chat-goal,.resume-strip,.home-next-step')).toHaveCount(0)
  await expect(page.getByRole('heading',{name:'Career assistant',exact:true})).toBeVisible();await expect(page.locator('.topbar')).toHaveCount(0)
  await page.getByRole('textbox',{name:'Message CareerBuddy'}).fill('Evaluate my profile');await page.getByRole('button',{name:'Send message',exact:true}).click()
  await expect(page.locator('.trace').last()).toBeVisible()
- await page.reload()
+ await page.reload();await nav(page,'AI Chat')
  await expect(page.getByText('With coach · saved conversation',{exact:true}).last()).toBeVisible()
  await page.screenshot({path:`../.local/careerbuddy-chat-${testInfo.project.name}.png`,fullPage:true})
  await nav(page,'Learning')
@@ -35,6 +43,14 @@ test('chat, competency roadmap, passport, jobs and consenting employer evidence'
  }
  await expect(python.getByText('Completed',{exact:true})).toHaveCount(3)
  await page.screenshot({path:`../.local/careerbuddy-roadmap-${testInfo.project.name}.png`,fullPage:true})
+ await nav(page,'Home')
+ await expect(page.locator('.home-skill-count')).toHaveText('1 foundational skill')
+ await expect(page.getByRole('progressbar',{name:'Roadmap competency progress'})).toHaveAttribute('value','3')
+ await page.screenshot({path:`../.local/careerbuddy-home-progress-${testInfo.project.name}.png`,fullPage:true})
+ const featured=page.locator('.home-job').first();const title=await featured.getByRole('heading').innerText()
+ await featured.getByRole('button',{name:'View role',exact:true}).click()
+ await expect(page.getByRole('dialog',{name:title,exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Close dialog'}).click()
  await nav(page,'Assessments')
  const passport=page.locator('.passport-skill').filter({hasText:'Python'})
  await passport.locator('summary').click()
@@ -62,7 +78,7 @@ test('chat, competency roadmap, passport, jobs and consenting employer evidence'
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
 })
 
-test('simple signup, adaptive onboarding and chat-first private workspace',async({page},testInfo)=>{
+test('simple signup, adaptive onboarding and a private Home snapshot',async({page},testInfo)=>{
  await page.goto('/');await page.getByRole('button',{name:'Create an account',exact:true}).click()
  const email=`new-${testInfo.project.name}-${Date.now()}@example.com`,password='Browser test account 2026!'
  await page.getByLabel('Full name',{exact:true}).fill('Jamie Patel')
@@ -78,8 +94,24 @@ test('simple signup, adaptive onboarding and chat-first private workspace',async
  await page.getByRole('button',{name:'Confirm skills and create my assessment'}).click()
  await expect(page.getByRole('dialog').getByText('Offline assessment fixture',{exact:true})).toBeVisible()
  await page.getByRole('button',{name:'Close dialog'}).click()
- await expect(page.getByRole('heading',{name:'Career assistant',exact:true})).toBeVisible()
- await page.reload();await expect(page.getByRole('heading',{name:'Career assistant',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Good to see you, Jamie.',exact:true})).toBeVisible()
+ await expect(page.locator('.home-skill-count')).toHaveText('0 foundational skills')
+ const extraGenerationRequests:string[]=[];page.on('request',request=>{if(/\/api\/(chat$|assessments|competencies|learning\/[^/]+\/expand)/.test(request.url()))extraGenerationRequests.push(request.url())})
+ await page.reload();await expect(page.getByRole('heading',{name:'Good to see you, Jamie.',exact:true})).toBeVisible()
+ expect(extraGenerationRequests).toEqual([])
+ await page.getByRole('button',{name:'Continue assessment',exact:true}).click()
+ await expect(page.getByRole('dialog')).toBeVisible();expect(extraGenerationRequests).toEqual([])
+ await grade(page,[0,0,0,0])
+ await page.getByRole('button',{name:'Back to my workspace'}).click()
+ await page.getByRole('button',{name:'Build my learning path',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'A clear path to AI Engineer.',exact:true})).toBeVisible()
+ await expect(page.locator('.path-card').filter({has:page.getByRole('heading',{name:'Python',exact:true})}).locator('.topic-node')).toHaveCount(3)
+ await nav(page,'Home')
+ await page.getByRole('button',{name:'Start lesson',exact:true}).click()
+ await expect(page.getByRole('dialog').getByRole('heading',{name:'Key takeaways',exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Close dialog'}).click()
+ await expect(page.getByRole('button',{name:'Continue lesson',exact:true})).toBeVisible()
+ await page.screenshot({path:`../.local/careerbuddy-home-student-${testInfo.project.name}.png`,fullPage:true})
  await nav(page,'Jobs');await expect(page.getByLabel('Career stage',{exact:true})).toHaveValue('early')
  await nav(page,'My Profile');await expect(page.getByRole('checkbox',{name:'Make my profile discoverable to employers'})).not.toBeChecked()
  await expect(page.getByLabel('Career goal',{exact:true})).toHaveValue('find_job')
@@ -87,7 +119,7 @@ test('simple signup, adaptive onboarding and chat-first private workspace',async
  await page.screenshot({path:`../.local/careerbuddy-dark-${testInfo.project.name}.png`,fullPage:true})
  await logout(page)
  await page.getByLabel('Email address',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click()
- await expect(page.getByRole('heading',{name:'Career assistant',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Good to see you, Jamie.',exact:true})).toBeVisible()
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
 })
 
@@ -97,7 +129,7 @@ test('chat renders rich Markdown safely and shows a pending-generation loader',a
  await page.route('**/api/chat/history',route=>route.fulfill({json:{revision:0,messages:[]}}))
  const markdown='# A path to AI engineering\n\n**Start small**, then build confidence with `Python`.\n\n1. Learn the fundamentals.\n2. Build one useful project.\n\n```python\nprint("hello, career")\n```\n\n| Skill | Next step |\n| --- | --- |\n| Python | Practice |\n\n[Python documentation](https://docs.python.org/3/)\n\n[Unsafe link](javascript:alert(1))\n\n<script>window.unsafeMarkdownExecuted = true</script>\n\n![tracking image](https://invalid.example/pixel.png)'
  await page.route('**/api/chat',async route=>{await new Promise(resolve=>setTimeout(resolve,1800));await route.fulfill({json:{message:markdown,mode:'mock',delegations:[]}})})
- await page.goto('/');await login(page,'candidate')
+ await page.goto('/');await login(page,'candidate');await nav(page,'AI Chat')
  await page.getByRole('textbox',{name:'Message CareerBuddy'}).fill('Show me a useful career plan')
  await page.getByRole('button',{name:'Send message',exact:true}).click()
  const loader=page.locator('.generation-loader').filter({hasText:'Connecting the dots'})

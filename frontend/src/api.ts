@@ -18,7 +18,7 @@ export interface Assessment {
   id: string; skill: string; status: 'pending' | 'completed'; created_at: string; questions: Question[]
   result?: {score: number; passed: boolean; scope: string; feedback: {question_id: string; correct: boolean; explanation: string}[]}
   kind: string; generation_model?: string; personalized_context?: string
-  competency_id?:string;competency_title?:string
+  competency_id?:string;competency_title?:string;completed_at?:string
 }
 export interface Job {
   id: string; title: string; company: string; location: string; description: string; required_skills: string[]
