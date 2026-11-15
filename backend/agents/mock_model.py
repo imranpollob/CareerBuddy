@@ -33,7 +33,7 @@ class MockModel(Model):
                 name = next(iter(specs))
                 inputs = {}
                 if name == "prepare_skill_assessment":
-                    inputs["skill"] = next((s for s in ["python", "rag", "llm", "pytorch", "aws", "evaluation", "sql"] if s in prompt.lower()), "" if "next" in prompt.lower() else "python")
+                    inputs["skill"] = next((s for s in ["python", "rag", "llm", "pytorch", "aws", "evaluation", "sql"] if s in prompt.lower()), "")
                 tools = [(name, inputs)]
             else:
                 text = prompt.lower()

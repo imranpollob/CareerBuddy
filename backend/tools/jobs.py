@@ -43,3 +43,11 @@ def requirements(jobs):
              "sources": [{"job_id": j["id"], "url": j["source_url"], "synthetic": j["synthetic"],
                           "retrieved_at": j["retrieved_at"]} for j in jobs if skill in j["required_skills"]]}
             for skill, count in counts.most_common()]
+
+
+def jobs_for_role(jobs, target_role):
+    """Conservative title coverage; never treat a different role's sample as demand."""
+    def words(value):
+        return ' '.join(re.findall(r'[a-z0-9]+',value.casefold()))
+    role=words(target_role)
+    return [job for job in jobs if role and f' {role} ' in f" {words(job['title'])} "]

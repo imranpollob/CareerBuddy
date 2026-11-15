@@ -10,7 +10,7 @@ One table, `SkillPilot`, uses string `PK` and `SK` keys and a `data` map per ite
 | --- | --- | --- | --- |
 | Account | `ACCOUNT#<normalized-email-hash>` | `CREDENTIALS` | Lookup by normalized email; stores user ID, email, Argon2 hash |
 | Session | `SESSION#<token-hash>` | `AUTH_SESSION` | Resolve identity and expiry; logout revokes the session |
-| Profile | `USER#<id>` | `PROFILE` | Own profile; consent-filtered employer discovery scans |
+| Profile | `USER#<id>` | `PROFILE` | Own profile, explicit goal confirmation, and neutral unknown fields; consent-filtered employer discovery scans |
 | Current skill evidence | `USER#<id>` | `SKILL#<skill>` | Query the user's latest assessment-backed evidence |
 | Assessment attempt | `USER#<id>` | `ASSESSMENT#<attempt-id>` | Owned attempt and history, including evaluation/topic references |
 | Private answer key | `USER#<id>` | `ASSESSMENT_KEY#<attempt-id>` | Server-side grading only; excluded from public responses |
@@ -38,7 +38,7 @@ New topic IDs have the form `<skill>:<evaluation-id>-<1..3>`; earlier paths may 
 - Authentication uses a random HttpOnly, SameSite=Strict cookie. Only the token digest is stored. Sessions default to four hours, rotate on login, and are revoked on logout. Expiry is enforced in application code; AWS TTL infrastructure is not provisioned.
 - Endpoints derive IDs and roles from the session. Profile edits cannot modify roles, scores, or assessment evidence. Login/signup attempt limits and origin checks are applied in FastAPI/auth code.
 - Onboarding confirmation atomically saves background and completed state with a revision guard. It creates neither an assessment nor a personal roadmap.
-- Learning evaluation checks skill excerpts against user answers. Confirmation validates model-selected focus IDs against market requirements and generates the first path before committing the profile, completed evaluation, active roadmap, path, and archives under the expected interview revision.
+- Learning evaluation checks skill excerpts against user answers. Confirmation validates and normalizes model-selected focus IDs, uses requirements from matching job titles when available, and generates the first path before committing the profile, completed evaluation, active roadmap, path, and archives under the expected interview revision.
 - Re-evaluation leaves the old roadmap available until confirmation succeeds. Earlier attempts and evidence are retained; active progress uses the current version's topics. Changing profile goal text alone does not replace an evaluated roadmap.
 - Assessment generation stores public questions and private keys together. Submission accepts choices only; Python computes the result. Completed attempt/evidence writes require a pending attempt, and competency aggregation also checks the path revision. Replay or stale writes return 409.
 - Employer discovery checks posting ownership and current candidate opt-in every time. It returns relevant evidence and match explanations, excluding private answers, chat, and learning history.
@@ -83,3 +83,7 @@ All paths below are relative to `/api`. Typed request/response schemas in OpenAP
 | `POST /chat`, `GET /chat/history` | Account | Orchestrator conversation/delegation and private text history |
 
 `GET /learning` does not create a roadmap for a fresh user. Some other reads derive/cache records or generate lesson content on explicit opening; this API is a local MVP rather than a uniformly read-only REST design.
+
+`goal_confirmed` records explicit user intent. New users have empty role/target fields, unspecified career purpose/track, and no claimed skills. Background onboarding does not infer a career purpose from student status. Learning evaluation requires target role and career purpose on its first answer and keeps those user values authoritative over model suggestions. Legacy unconfirmed defaults are normalized in API/model context without deleting stored evidence.
+
+Career paths store `market_role_covered` and `market_job_ids`. Exact normalized title-phrase matching conservatively selects the saved postings relevant to a target role. Roles outside the snapshot can use new validated skill IDs and general learning guidance; they do not inherit AI-job demand counts. Current-path lessons and assessments use only the selected market subset.

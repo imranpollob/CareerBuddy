@@ -1,6 +1,6 @@
 # CareerBuddy
 
-CareerBuddy helps candidates understand their current skills, build a learning plan toward AI engineering, demonstrate progress through assessments, and compare that evidence with real job requirements. Employers can create postings and discover consenting candidates with relevant evidence.
+CareerBuddy helps candidates understand their current skills, build a learning plan toward their chosen role, demonstrate progress through assessments, and compare that evidence with real job requirements. Employers can create postings and discover consenting candidates with relevant evidence.
 
 Built for the BuilderWars AWS Hackathon with **React, TypeScript, Vite, Tailwind CSS, FastAPI, Strands Agents, Amazon Bedrock, and one DynamoDB table**. The product is named CareerBuddy; internal configuration uses `SKILLPILOT_*` and the table is named `SkillPilot`.
 
@@ -9,7 +9,7 @@ Built for the BuilderWars AWS Hackathon with **React, TypeScript, Vite, Tailwind
 ### Accounts, onboarding, and profile
 
 - Email/password signup and login for candidates and employers; Argon2 password hashing and expiring, revocable sessions.
-- Four numbered onboarding questions: current role, highest education, experience from 0–30 years, and one of four self-reported expertise levels.
+- No target role or career purpose is assigned at signup. Four numbered onboarding questions: current role, highest education, experience from 0–30 years, and one of four self-reported expertise levels.
 - Saved onboarding progress across reloads. Completion saves background only; it creates no assessment or roadmap.
 - Current role, target role, self-reported skills, and career purpose: stay relevant, find a job, or switch careers.
 - Private records attached to the authenticated account. Candidate discovery is off until the candidate opts in.
@@ -26,9 +26,9 @@ Built for the BuilderWars AWS Hackathon with **React, TypeScript, Vite, Tailwind
 
 ### Profile evaluation and roadmap
 
-- A separate **three-question, numbered learning evaluation** asks dynamic follow-ups about skills, projects, and goals through Strands and Bedrock.
+- A separate **three-question, numbered learning evaluation** first collects an explicit target role and career purpose, then asks dynamic follow-ups about skills, projects, and goals through Strands and Bedrock.
 - Candidates review the proposed role, goal, and self-reported skills before confirming. Skill claims require supporting excerpts from their answers.
-- Coach selects and orders one to six focus skills from available job requirements using the interview, background, and assessment evidence.
+- Coach selects and orders one to six focus skills using the chosen role, interview, background, and assessment evidence. Matching job-title requirements are used when available; other roles receive general learning guidance without market-demand claims.
 - Confirmation generates the first three-competency path and saves a versioned personal roadmap. Other focus skills can be expanded on demand.
 - **Re-evaluate profile** starts a new interview. The existing roadmap remains available until the replacement succeeds.
 - Replacement roadmaps use new topic IDs; old assessment history and evidence remain saved. Progress counts generated competencies only.
@@ -55,7 +55,7 @@ Built for the BuilderWars AWS Hackathon with **React, TypeScript, Vite, Tailwind
 
 - **68 sourced job postings from nine employers**, collected through free Greenhouse and Ashby APIs and stored directly in the project.
 - All 68 are tagged: **574 source-grounded skill tags across 106 distinct skills**, with required/preferred classifications, original URLs, and retrieval dates.
-- Search and career-stage filtering, including eight internship/entry-level postings.
+- Search and career-stage filtering, including eight internship/entry-level postings. The initial stage filter is All; student status does not silently select early-career jobs.
 - Explainable supported and missing requirements based on passed assessment evidence; self-reported skills do not count toward coverage.
 - Job details expose source excerpts and original application links. Public job listings are shared market data, not other candidates' private records.
 - Manual import/tagging scripts refresh the snapshot; employer-created postings are analyzed when saved.
@@ -237,7 +237,7 @@ Brand assets live in `frontend/public/`; shared components are in `frontend/src/
 
 ## Validation
 
-Latest recorded checks: **75 backend tests**, **6 browser tests** across desktop/mobile, and a successful TypeScript/Vite production build.
+Latest recorded checks: **78 backend tests**, **6 browser tests** across desktop/mobile, and a successful TypeScript/Vite production build.
 
 ```bash
 uv run pytest -q
@@ -257,11 +257,11 @@ uv run python -m scripts.local_persistence_smoke
 uv run python -m scripts.live_agents_smoke
 ```
 
-Earlier focused live checks exercised Bedrock delegation and generated content with DynamoDB Local. The latest learning-evaluation flow has been checked with mock inference and memory/DynamoDB repository tests; a full live Bedrock evaluation/redo check remains to be run. Private reports and screenshots stay in ignored `.local/`.
+Earlier focused live checks exercised Bedrock delegation and generated content with DynamoDB Local. A focused live Bedrock check generated a Writer roadmap and its first three competencies without market requirements. The complete learning-evaluation flow has been checked with mock inference and memory/DynamoDB repository tests; a full live Bedrock evaluation/redo check remains to be run. Private reports and screenshots stay in ignored `.local/`.
 
 ## Scope and deployment status
 
-- The saved job dataset focuses on AI engineering and related roles. Editing a goal does not collect another occupation's dataset; snapshots can become stale and are not a market census.
+- Learning roadmaps can cover roles beyond AI engineering. The saved job dataset still focuses on AI engineering and related roles. Goals without matching saved job titles receive general guidance, and Home does not promote unrelated jobs as relevant opportunities. Editing a goal does not collect another occupation's dataset; snapshots can become stale and are not a market census.
 - Objective quizzes award limited **Foundational** evidence. Coding/project grading and the **Applied/Demonstrated** levels are not implemented.
 - Scheduled reminders, candidate invitations, application tracking, and complete recruiting workflows are not implemented.
 - Email verification, password reset, MFA, independent employer verification, and distributed rate limiting are outside the current MVP.
@@ -275,3 +275,5 @@ Earlier focused live checks exercised Bedrock delegation and generated content w
 - [Original SkillPilot architecture](docs/ARCHITECTURE.md): preserved project brief; describes intended scope, including deployment, rather than current delivery status.
 - [Original CareerBuddy feature plan](docs/CAREERBUDDY_FEATURES.md): preserved requirements; includes later features. The implemented feature list is this README.
 - [AWS Strands workshop](https://github.com/aws-samples/sample-strands-agents-hands-on-workshop): reference patterns for agent tools, steering, AgentCore, delegation, and evaluations.
+
+Unknown background/goal values remain empty or `unspecified`. Legacy unconfirmed signup defaults are hidden from model/UI context until the user chooses a goal; stored assessment history is preserved. The AI-engineering job snapshot describes the available market sample rather than a user’s intended role.

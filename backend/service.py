@@ -8,7 +8,6 @@ from backend.models import Profile, ProfileUpdate, Job, JobCreate
 from backend.tools.assessments import BANK, LESSONS, public_questions, grade
 from backend.tools.jobs import SKILLS, requirements, normalize_skills, skill_label
 from backend.tools.matching import match
-from backend.demo import JOURNEYS
 
 
 def now():
@@ -38,14 +37,21 @@ class Service:
                 result.setdefault(claim["skill"],claim["label"])
         return result
 
-    def profile(self, uid="candidate-demo"):
+    def profile(self, uid):
         profile = self.repo.get(f"USER#{uid}", "PROFILE")
         if profile is None:
             raise ValueError("Profile not found")
-        return Profile.model_validate(profile).model_dump()
+        profile=Profile.model_validate(profile).model_dump()
+        if not profile['synthetic'] and not profile['goal_confirmed']:
+            # Older signups stored a goal the person never selected. Keep raw records,
+            # but never present those defaults to the UI or model as user intent.
+            profile.update(target_role='',career_goal='unspecified')
+            if profile['current_role']=='Getting started':profile['current_role']=''
+            if profile['candidate_track']=='career_switcher':profile['candidate_track']='unspecified'
+        return profile
 
     def update_profile(self, uid, update: ProfileUpdate):
-        profile = Profile.model_validate({**self.profile(uid), **update.model_dump()}).model_dump()
+        profile = Profile.model_validate({**self.profile(uid), **update.model_dump(), "goal_confirmed":bool(update.target_role.strip() and update.career_goal!="unspecified")}).model_dump()
         self.repo.write([item(f"USER#{uid}", "PROFILE", profile)])
         return profile
 
@@ -61,16 +67,15 @@ class Service:
 
     def market(self, uid=None):
         jobs = self.jobs()
-        if uid and self.profile(uid)["candidate_track"] == "student":
-            early = [j for j in jobs if j.get("career_level") in {"internship", "entry"}]
-            if early:
-                jobs = early
         return {"jobs": jobs, "requirements": requirements(jobs), "posting_count": len(jobs),
                 "note": "Frequency is counted from this small posting sample; it is not a market-wide estimate."}
 
     def journey(self, uid):
-        track = self.profile(uid)["candidate_track"]
-        return JOURNEYS.get(track, JOURNEYS["career_switcher"])
+        profile=self.profile(uid)
+        return {'title':profile['target_role'] or 'Choose your career direction',
+                'description':'Guidance uses your confirmed goal, background and assessment evidence.',
+                'portfolio_project':'Choose a project after evaluating your skills and goal.',
+                'suggested_prompt':'Help me evaluate my skills and career goals.', 'target_levels':[]}
 
     def create_job(self, employer_id, request: JobCreate):
         job = Job(**request.model_dump(), id=uuid4().hex, employer_id=employer_id,
@@ -107,7 +112,7 @@ class Service:
             interview=self.repo.get(f"USER#{uid}","LEARNING_EVALUATION#active") or self.repo.get(f"USER#{uid}","ONBOARDING#active") or {}
             prior=[q["prompt"] for a in self.repo.partition(f"USER#{uid}","ASSESSMENT#") if a["skill"]==skill for q in a["questions"]][-12:]
             context={"claimed_skill_evidence":interview.get("claims",[]),"prior_question_prompts":prior,
-                     "latest_assessed_skills":self.skills(uid),"market_requirements":self.market(uid)["requirements"][:5]}
+                     "latest_assessed_skills":self.skills(uid),"market_requirements":self.learning.requirements(uid)[:5]}
             if competency:
                 context["target_competency"]=competency
                 data.update(competency_id=competency_id,competency_title=competency["title"])
@@ -185,9 +190,6 @@ class Service:
         previous = {m["skill"]: m for m in existing["milestones"]}
         milestones = []
         requirements = self.market(uid)["requirements"]
-        if self.profile(uid)["candidate_track"] == "student":
-            foundation_order = {"python": 0, "sql": 1, "llm": 2}
-            requirements.sort(key=lambda r: (foundation_order.get(r["skill"], 3), -r["job_count"]))
         for requirement in requirements:
             skill = requirement["skill"]
             if skill in demonstrated and skill not in previous:
@@ -227,8 +229,7 @@ class Service:
     def matches(self, uid):
         skills = self.skills(uid)
         matches = [match(job, skills) for job in self.jobs()]
-        student = self.profile(uid)["candidate_track"] == "student"
-        matches.sort(key=lambda m: (int(student and m["job"].get("career_level") not in {"entry", "internship"}),
+        matches.sort(key=lambda m: (0,
                                     -m["supported_count"] / m["required_count"], m["job"]["title"]))
         # Store only compact match snapshots; never cache private candidate discovery.
         if matches:
@@ -253,7 +254,7 @@ class Service:
             # Deliberate projection: no contact info, answers, chat, or private roadmap.
             candidates.append({"id": profile["id"], "name": profile["name"], "current_role": profile["current_role"],
                                "target_role": profile["target_role"], "synthetic": profile["synthetic"],
-                               "candidate_track": profile.get("candidate_track", "career_switcher"),
+                               "candidate_track": profile.get("candidate_track", "unspecified"),
                                **{k: v for k, v in result.items() if k != "job"}})
         return sorted(candidates, key=lambda c: -c["supported_count"])
 

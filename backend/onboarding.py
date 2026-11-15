@@ -47,7 +47,7 @@ class Onboarding:
         done=index==3
         role=answers.get('current_role',state['current_role'])
         updated={**state,'revision':revision+1,'answers':answers,'current_role':role,
-                 'candidate_track':'student' if 'student' in role.lower() else 'career_switcher',
+                 'candidate_track':'student' if 'student' in role.lower() else 'unspecified',
                  'status':'review' if done else 'interview','question_number':min(index+2,4),
                  'question':'' if done else QUESTIONS[index+1],'options':[] if done else OPTIONS[index+1],
                  'messages':state['messages']+[{'role':'user','content':f'{QUESTIONS[index]} {answer}'}]}
@@ -59,7 +59,7 @@ class Onboarding:
         if state['status']!='review' or state['revision']!=revision:
             raise Conflict('Complete the four questions before confirming.')
         profile=Profile.model_validate({**self.service.profile(uid),**state['answers'],
-                'candidate_track':state['candidate_track'],'career_goal':'find_job' if state['candidate_track']=='student' else 'switch_careers','onboarding_completed':True}).model_dump()
+                'candidate_track':state['candidate_track'],'onboarding_completed':True}).model_dump()
         updated={**state,'revision':revision+1,'status':'completed'}
         self.repo.write([item(f'USER#{uid}','PROFILE',profile),item(f'USER#{uid}','ONBOARDING#active',updated)],
                         expected_revision=(f'USER#{uid}','ONBOARDING#active',revision))

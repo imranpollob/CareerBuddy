@@ -202,7 +202,7 @@ def create_app(repo=None, settings=None):
         return service.roadmap(session.uid)
 
     from backend.evaluation import Evaluation
-    from backend.models import LearningEvaluation
+    from backend.models import LearningEvaluation, LearningEvaluationAnswer
     evaluation=Evaluation(service)
 
     @app.get('/api/learning/evaluation',response_model=LearningEvaluation | None)
@@ -214,8 +214,8 @@ def create_app(repo=None, settings=None):
         return evaluation.begin(session.uid)
 
     @app.post('/api/learning/evaluation/answer',response_model=LearningEvaluation)
-    def answer_learning_evaluation(body:OnboardingAnswer,session=Depends(candidate)):
-        return evaluation.answer(session.uid,body.answer,body.revision)
+    def answer_learning_evaluation(body:LearningEvaluationAnswer,session=Depends(candidate)):
+        return evaluation.answer(session.uid,body.answer,body.revision,body.target_role,body.career_goal)
 
     @app.post('/api/learning/evaluation/complete',response_model=LearningRecord)
     def complete_learning_evaluation(body:OnboardingConfirm,session=Depends(candidate)):
@@ -226,7 +226,7 @@ def create_app(repo=None, settings=None):
         return service.learning.plan(session.uid)
 
     def require_learning_evaluation(uid):
-        if not (service.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}).get('evaluation_id'):
+        if (not service.profile(uid)['goal_confirmed'] and not service.profile(uid)['synthetic']) or not (service.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}).get('evaluation_id'):
             raise Conflict('Evaluate your profile in Learning before creating a roadmap.')
 
     @app.post("/api/learning",response_model=LearningRecord)

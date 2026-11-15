@@ -100,7 +100,7 @@ def test_learning_evaluation_and_replacement_survive_reload(repository):
     evaluation=Evaluation(service);uid='candidate-demo'
     state=evaluation.begin(uid)
     for answer in ['I use Python and SQL and want an AI Engineer role.','I built a Python FastAPI project with SQL.','I owned the API and tests and want to learn LLMs.']:
-        state=evaluation.answer(uid,answer,state['revision'])
+        state=evaluation.answer(uid,answer,state['revision'],target_role='AI Engineer',career_goal='switch_careers')
     first=evaluation.complete(uid,state['revision'])
     restored=Service(repository,Settings(ai_mode='mock',seed_accounts=True))
     assert restored.learning.plan(uid)==first

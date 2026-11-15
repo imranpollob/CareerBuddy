@@ -1,15 +1,16 @@
 export type Role = 'candidate' | 'employer'
 export type CareerLevel = 'internship' | 'entry' | 'mid' | 'senior' | 'unspecified'
-export type CandidateTrack = 'career_switcher' | 'student' | 'experienced' | 'employer'
+export type CandidateTrack = 'career_switcher' | 'student' | 'experienced' | 'employer' | 'unspecified'
 export interface Profile {
   id: string; role: Role; name: string; current_role: string; target_role: string
   claimed_skills: string[]; marketplace_opt_in: boolean; synthetic: boolean
   candidate_track: CandidateTrack
+  goal_confirmed?:boolean
   onboarding_completed: boolean
   career_goal: CareerGoal
 }
-export type CareerGoal='stay_relevant'|'find_job'|'switch_careers'
-export const GOALS:Record<CareerGoal,string>={stay_relevant:'Stay relevant in my current role',find_job:'Find a new job',switch_careers:'Switch careers'}
+export type CareerGoal='unspecified'|'stay_relevant'|'find_job'|'switch_careers'
+export const GOALS:Record<CareerGoal,string>={unspecified:'Choose a career goal',stay_relevant:'Stay relevant in my current role',find_job:'Find a new job',switch_careers:'Switch careers'}
 export interface AccountSession { profile: Profile; email: string; mode: 'mock' | 'bedrock' }
 export type ProfileUpdate = Pick<Profile, 'name' | 'current_role' | 'target_role' | 'claimed_skills' | 'marketplace_opt_in'|'career_goal'>
 export interface Evidence { skill: string; assessment_id: string; score: number; passed: boolean; assessed_at: string; scope: string; synthetic: boolean;mastery?:string;competency_ids?:string[];assessment_ids?:string[] }
@@ -40,7 +41,7 @@ export interface Health { ai_mode: 'mock' | 'bedrock'; repository: string; model
 export interface ChatResponse { message: string; mode: 'mock' | 'bedrock'; delegations: {specialist: string; tools: string[]; result: {summary: string; data: Record<string, unknown>}}[] }
 export interface OnboardingState {question_number:number;total_questions:number;options:string[];answers:Record<string,string|number>;revision:number;status:'interview'|'review'|'completed';mode:'mock'|'bedrock';question:string;messages:{role:'assistant'|'user';content:string}[];claims:{skill:string;label:string;evidence_excerpt:string}[];current_role:string;target_role:string;candidate_track:CandidateTrack;career_goal:CareerGoal}
 export interface Topic {id:string;skill:string;title:string;objective:string;format:'knowledge'|'scenario';status:'available'|'current'|'completed'|'practice_needed';lesson_completed:boolean;evidence:(Evidence&{id:string;title:string})|null}
-export interface LearningPlan {evaluation_id?:string|null;summary?:string|null;target_role:string;career_goal:CareerGoal;skills:{skill:string;label:string;job_count:number;rationale:string;expanded:boolean;topics:Topic[];mastery:string}[];next_topic:Topic|null;activity:{kind:'lesson'|'assessment';competency_id?:string;assessment_id?:string;skill:string;title:string}|null;completed_topics:number;total_topics:number;note:string}
+export interface LearningPlan {market_role_covered?:boolean;evaluation_id?:string|null;summary?:string|null;target_role:string;career_goal:CareerGoal;skills:{skill:string;label:string;job_count:number;rationale:string;expanded:boolean;topics:Topic[];mastery:string}[];next_topic:Topic|null;activity:{kind:'lesson'|'assessment';competency_id?:string;assessment_id?:string;skill:string;title:string}|null;completed_topics:number;total_topics:number;note:string}
 export interface Passport {skills:Evidence[];competencies:(Evidence&{id:string;title:string})[];assessments:Assessment[];strengths:string[];next_steps:string[];note:string}
 export interface Conversation {revision:number;messages:{role:'user'|'assistant';text:string;created_at:string;specialists:string[]}[]}
 
@@ -48,7 +49,7 @@ const BASE_LABELS: Record<string, string> = {python:'Python', sql:'SQL', llm:'LL
 export const LABELS: Record<string, string> = {...BASE_LABELS}
 export function setSkillCatalog(catalog:Record<string,string>={}){for(const key of Object.keys(LABELS))delete LABELS[key];Object.assign(LABELS,BASE_LABELS,catalog)}
 export const LEVELS: Record<CareerLevel,string> = {internship:'Internship',entry:'Entry / graduate',mid:'Mid-level',senior:'Senior',unspecified:'Level not specified'}
-export const TRACKS: Record<CandidateTrack,string> = {career_switcher:'Career transition',student:'Student / graduate',experienced:'Experienced engineer',employer:'Employer'}
+export const TRACKS: Record<CandidateTrack,string> = {unspecified:'Not specified',career_switcher:'Career transition',student:'Student / graduate',experienced:'Experienced engineer',employer:'Employer'}
 export function skillLabel(skill:string){return LABELS[skill] || skill.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message) } }

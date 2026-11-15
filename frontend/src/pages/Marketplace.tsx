@@ -6,9 +6,9 @@ import { Modal } from '../components/Modal'
 export function Marketplace({matches,student=false,initialJob=null}: {matches: Match[];student?:boolean;initialJob?:Job|null}) {
   const [query,setQuery]=useState('')
   const [selected,setSelected]=useState<Job|null>(initialJob)
-  const [level,setLevel]=useState<CareerLevel|'all'|'early'>(student?'early':'all')
+  const [level,setLevel]=useState<CareerLevel|'all'|'early'>('all')
   const filtered=matches.filter(m=>(level==='all' || (level==='early'?['entry','internship'].includes(m.job.career_level):m.job.career_level===level)) && `${m.job.title} ${m.job.company} ${m.job.required_skills.join(' ')}`.toLowerCase().includes(query.toLowerCase()))
-  return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">OPPORTUNITIES</p><h1>Find your next opportunity.</h1><p className="muted">See how your demonstrated fundamentals align with each role.</p></div></div>
+  return <div className="page-stack"><div className="page-title"><div><p className="eyebrow">OPPORTUNITIES</p><h1>Find your next opportunity.</h1><p className="muted">Browse the saved AI-engineering job sample and compare its requirements with your assessment evidence.</p></div></div>
     <div className="notice"><BriefcaseBusiness size={20}/><span>Coverage compares assessment evidence with identified skills. When a posting lists only preferred skills, coverage uses those skills. Read the original posting for full requirements.</span></div>
     <label className="level-filter">Career stage<select aria-label="Career stage" value={level} onChange={e=>setLevel(e.target.value as typeof level)}><option value="all">All career stages</option><option value="early">Internships + entry / graduate</option>{Object.entries(LEVELS).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
     <div className="market-toolbar"><label className="search"><Search size={17}/><input aria-label="Search jobs" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search roles, companies, skills…"/></label><span className="muted text-sm">{filtered.length} opportunities · stage preference, then evidence coverage</span></div>

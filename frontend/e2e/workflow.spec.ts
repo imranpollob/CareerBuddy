@@ -10,7 +10,8 @@ async function evaluateProfile(page:Page,student=true){
  const dialog=page.getByRole('dialog',{name:'Profile evaluation',exact:true})
  for(const [i,answer] of [student?'I am a student using Python and SQL. I want an AI Engineer job.':'I am a software engineer using Python and SQL. I want an AI Engineer job.','I built a Python FastAPI service and queried data with SQL.','I owned the API and tests and want to learn LLM applications.'].entries()){
   await expect(dialog.getByText(`${i+1} of 3`,{exact:true})).toBeVisible()
-  await dialog.getByRole('textbox').fill(answer)
+  if(i===0){await dialog.getByLabel('Target role',{exact:true}).fill('AI Engineer');await dialog.getByLabel('Career purpose',{exact:true}).selectOption(student?'find_job':'switch_careers')}
+  await dialog.locator('#evaluation-answer').fill(answer)
   await dialog.getByRole('button',{name:'Continue',exact:true}).click()
  }
  await dialog.getByRole('button',{name:'Generate my roadmap',exact:true}).click()
@@ -135,7 +136,7 @@ test('simple signup, adaptive onboarding and a private Home snapshot',async({pag
  await page.getByRole('button',{name:'Back to my workspace'}).click()
  await nav(page,'Learning')
  await expect(page.getByRole('heading',{name:'A clear path to AI Engineer.',exact:true})).toBeVisible()
- await expect(page.locator('.path-card').filter({has:page.getByRole('heading',{name:'Python',exact:true})}).locator('.topic-node')).toHaveCount(3)
+ await expect(page.locator('.path-card').first().locator('.topic-node')).toHaveCount(3)
  await nav(page,'Home')
  await page.getByRole('button',{name:/^(Start|Review) lesson$/,exact:true}).click()
  await expect(page.getByRole('dialog').getByRole('heading',{name:'Key takeaways',exact:true})).toBeVisible()
@@ -148,7 +149,7 @@ test('simple signup, adaptive onboarding and a private Home snapshot',async({pag
  await expect(page.getByText('0 of 3 planned competencies completed.',{exact:false})).toBeVisible()
  await nav(page,'Assessments')
  await expect(page.getByText('No assessment attempts yet.',{exact:true})).toHaveCount(0)
- await nav(page,'Jobs');await expect(page.getByLabel('Career stage',{exact:true})).toHaveValue('early')
+ await nav(page,'Jobs');await expect(page.getByLabel('Career stage',{exact:true})).toHaveValue('all')
  await nav(page,'My Profile');await expect(page.getByRole('checkbox',{name:'Make my profile discoverable to employers'})).not.toBeChecked()
  await expect(page.getByLabel('Career goal',{exact:true})).toHaveValue('find_job')
  await nav(page,'AI Chat');if(await page.getByRole('button',{name:'Switch to light theme'}).count())await page.getByRole('button',{name:'Switch to light theme'}).click();await page.getByRole('button',{name:'Switch to dark theme'}).click()

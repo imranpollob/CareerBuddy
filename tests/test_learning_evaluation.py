@@ -11,7 +11,7 @@ def review(client):
                                    'I built a Python API with FastAPI and used SQL to query data.',
                                    'I owned the API and tests. I want to learn LLM application design.']):
         assert state['question_number']==index+1 and state['total_questions']==3
-        response=client.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':answer})
+        response=client.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':answer,'target_role':'AI Engineer','career_goal':'find_job'})
         assert response.status_code==200,response.text
         state=response.json()
     assert state['status']=='review'
@@ -53,11 +53,11 @@ def test_dynamic_evaluation_creates_private_versioned_roadmap_and_redo_preserves
 def test_evaluation_model_failure_stale_revision_and_unsupported_claims_are_safe(candidate,monkeypatch):
     state=candidate.post('/api/learning/evaluation').json()
     assert candidate.post('/api/learning/evaluation').json()==state
-    assert candidate.post('/api/learning/evaluation/answer',json={'revision':999,'answer':'Python'}).status_code==409
+    assert candidate.post('/api/learning/evaluation/answer',json={'revision':999,'answer':'Python','target_role':'AI Engineer','career_goal':'find_job'}).status_code==409
     def broken(*args):raise GenerationError('Try again')
     original=candidate.app.state.service.intelligence.interview
     monkeypatch.setattr(candidate.app.state.service.intelligence,'interview',broken)
-    assert candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'Python'}).status_code==503
+    assert candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'Python','target_role':'AI Engineer','career_goal':'find_job'}).status_code==503
     assert candidate.get('/api/learning/evaluation').json()==state
     monkeypatch.setattr(candidate.app.state.service.intelligence,'interview',original)
     state=review(candidate)
@@ -90,7 +90,7 @@ def test_evaluation_rejects_ungrounded_skill_claims(candidate,monkeypatch):
     monkeypatch.setattr(candidate.app.state.service.intelligence,'interview',lambda *args:OnboardingTurn(
         question='Which projects have you built?',current_role='Engineer',target_role='AI Engineer',candidate_track='career_switcher',
         ready_to_review=False,claims=[{'skill':'rust','label':'Rust','evidence_excerpt':'I built Rust systems'}]))
-    assert candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'I use Python'}).status_code==400
+    assert candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':'I use Python','target_role':'AI Engineer','career_goal':'find_job'}).status_code==400
     assert candidate.get('/api/learning/evaluation').json()==state
     assert candidate.get('/api/passport').json()['skills']==[]
 
@@ -106,3 +106,62 @@ def test_profile_goal_edit_does_not_replace_evaluated_plan_until_redo(candidate)
     assert after['evaluation_id']==before['evaluation_id']
     assert after['target_role']==before['target_role']
     assert after['skills']==before['skills']
+
+
+def test_signup_and_background_never_invent_goal_and_first_evaluation_collects_it(client,monkeypatch,repo):
+    signed=client.post('/api/auth/signup',json={'name':'New person','email':'no-goal@example.com','password':'A long test password 2026!'})
+    profile=signed.json()['profile'];uid=profile['id']
+    assert profile['target_role']=='' and profile['career_goal']=='unspecified'
+    assert profile['candidate_track']=='unspecified' and profile['current_role']==''
+    state=client.get('/api/onboarding').json()
+    for answer in ['Student','Bachelor’s degree','0','Beginner']:
+        state=client.post('/api/onboarding/answer',json={'revision':state['revision'],'answer':answer}).json()
+    profile=client.post('/api/onboarding/complete',json={'revision':state['revision']}).json()
+    assert profile['current_role']=='Student' and profile['target_role']=='' and profile['career_goal']=='unspecified'
+    def should_not_infer(*args):raise AssertionError('No model needed before an explicit goal')
+    monkeypatch.setattr(client.app.state.service.intelligence,'interview',should_not_infer)
+    evaluation=client.post('/api/learning/evaluation').json()
+    assert 'AI Engineer' not in evaluation['question'] and evaluation['target_role']==''
+    assert client.post('/api/learning/evaluation/answer',json={'revision':evaluation['revision'],'answer':'I use Python'}).status_code==400
+    assert client.post('/api/assessments',json={}).status_code==422
+    assert client.get('/api/dashboard').json()['journey']['title']=='Choose your career direction'
+    # Legacy automatic values are not exposed as confirmed intent or overwritten in storage.
+    raw=repo.get(f'USER#{uid}','PROFILE');raw.update(target_role='AI Engineer',career_goal='switch_careers',candidate_track='career_switcher')
+    repo.write([item(f'USER#{uid}','PROFILE',raw)])
+    assert client.get('/api/session').json()['profile']['target_role']==''
+    assert repo.get(f'USER#{uid}','PROFILE')['target_role']=='AI Engineer'
+
+
+def test_writer_roadmap_accepts_new_skills_without_borrowing_ai_market_claims(candidate,monkeypatch):
+    from backend.models import GeneratedRoadmap
+    from backend.tools.jobs import jobs_for_role
+    assert jobs_for_role(candidate.app.state.service.jobs(),'writer')==[]
+    state=candidate.post('/api/learning/evaluation').json()
+    for answer in ['I am a student and want to write short stories.','I write essays for school.','I want to improve narrative structure and editing.']:
+        state=candidate.post('/api/learning/evaluation/answer',json={'revision':state['revision'],'answer':answer,
+            'target_role':'Writer','career_goal':'switch_careers'}).json()
+    ai=candidate.app.state.service.intelligence
+    def writing_roadmap(profile,messages,requirements,evidence):
+        assert profile['target_role']=='Writer' and requirements==[]
+        return GeneratedRoadmap(focus_skills=['Narrative Structure','Editing'],summary='Practice narrative structure and editing based on your writing goal and interview.')
+    monkeypatch.setattr(ai,'roadmap',writing_roadmap)
+    response=candidate.post('/api/learning/evaluation/complete',json={'revision':state['revision']})
+    assert response.status_code==200,response.text
+    plan=response.json()
+    assert plan['target_role']=='Writer' and not plan['market_role_covered']
+    assert [s['skill'] for s in plan['skills']]==['narrative_structure','editing']
+    assert all(s['job_count']==0 for s in plan['skills'])
+    assert plan['total_topics']==3
+    assert candidate.post('/api/learning/editing/expand').status_code==200
+    topic=plan['next_topic']
+    assert candidate.get(f"/api/competencies/{topic['id']}/lesson").status_code==200
+    attempt=candidate.post('/api/assessments',json={'skill':topic['skill'],'competency_id':topic['id']})
+    assert attempt.status_code==200 and len(attempt.json()['questions'])==4
+    assert candidate.get('/api/learning').json()['target_role']=='Writer'
+
+
+def test_general_roadmap_still_validates_skill_ids():
+    from backend.models import GeneratedRoadmap
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):GeneratedRoadmap(focus_skills=['../arbitrary-path'],summary='A sufficiently long explanation.')
+    with pytest.raises(ValidationError):GeneratedRoadmap(focus_skills=['Editing','editing'],summary='A sufficiently long explanation.')

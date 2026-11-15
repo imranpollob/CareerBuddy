@@ -3,6 +3,7 @@ from uuid import uuid4
 from backend.db import item, Conflict
 from backend.models import LearningEvaluation, Profile
 from backend.intelligence import normalized_text
+from backend.tools.jobs import jobs_for_role, requirements
 
 
 class Evaluation:
@@ -17,30 +18,36 @@ class Evaluation:
 
     def begin(self,uid):
         existing=self.get(uid)
-        if existing and existing['status']!='completed':return existing
+        if existing and existing['status']!='completed' and existing.get('flow_version')==4:return existing
         profile=self.service.profile(uid)
-        turn=self.service.intelligence.interview(profile,[])
-        state=LearningEvaluation(id=uuid4().hex,revision=existing['revision']+1 if existing else 0,
-            status='interview',mode=self.service.intelligence.settings.ai_mode,question=turn.question,
-            question_number=1,total_questions=3,messages=[{'role':'assistant','content':turn.question}],claims=[],
+        # Resume only interviews that collected explicit goals; old questions may contain defaults.
+        question='What role would you like to work toward, and which skills or projects would you like us to consider?'
+        state=LearningEvaluation(flow_version=4,id=uuid4().hex,revision=existing['revision']+1 if existing else 0,
+            status='interview',mode=self.service.intelligence.settings.ai_mode,question=question,
+            question_number=1,total_questions=3,messages=[{'role':'assistant','content':question}],claims=[],
             current_role=profile['current_role'],target_role=profile['target_role'],candidate_track=profile['candidate_track'],
             career_goal=profile['career_goal']).model_dump()
         pk=f'USER#{uid}'
         self.repo.write([item(pk,self.KEY,state)],**({'expected_revision':(pk,self.KEY,existing['revision'])} if existing else {'absent':(pk,self.KEY)}))
         return state
 
-    def answer(self,uid,answer,revision):
+    def answer(self,uid,answer,revision,target_role=None,career_goal=None):
         state=self.get(uid)
         if not state or state['status']!='interview' or state['revision']!=revision:
             raise Conflict('This evaluation changed. Refresh before answering.')
+        if state['question_number']==1:
+            if not target_role or not target_role.strip() or career_goal not in {'stay_relevant','find_job','switch_careers'}:
+                raise ValueError('Choose your target role and career purpose before continuing.')
+            state={**state,'target_role':target_role.strip(),'career_goal':career_goal}
+            answer=f"Target role: {state['target_role']}. Career purpose: {career_goal}. " + answer
         messages=state['messages']+[{'role':'user','content':answer}]
         count=sum(m['role']=='user' for m in messages)
-        turn=self.service.intelligence.interview(self.service.profile(uid),messages)
+        turn=self.service.intelligence.interview({**self.service.profile(uid),'target_role':state['target_role'],'career_goal':state['career_goal'],'goal_confirmed':True},messages)
         source=normalized_text(' '.join(m['content'] for m in messages if m['role']=='user'))
         if any(not normalized_text(c.evidence_excerpt) or normalized_text(c.evidence_excerpt) not in source for c in turn.claims):
             raise ValueError('A proposed skill was not supported by your answers. Please retry.')
         state={**state,**turn.model_dump(exclude={'ready_to_review'}),'revision':revision+1,
-               'status':'review' if count==3 else 'interview','question_number':min(count+1,3),
+               'target_role':state['target_role'],'career_goal':state['career_goal'],'status':'review' if count==3 else 'interview','question_number':min(count+1,3),
                'messages':messages+[{'role':'assistant','content':turn.question}]}
         self.repo.write([item(f'USER#{uid}',self.KEY,state)],expected_revision=(f'USER#{uid}',self.KEY,revision))
         return LearningEvaluation.model_validate(state).model_dump()
@@ -51,17 +58,16 @@ class Evaluation:
             raise Conflict('Review the current evaluation before creating a roadmap.')
         pk=f'USER#{uid}'
         profile=Profile.model_validate({**self.service.profile(uid),**{k:state[k] for k in ['current_role','target_role','candidate_track','career_goal']},
-                                       'claimed_skills':list(dict.fromkeys(c['skill'] for c in state['claims']))}).model_dump()
-        requirements=self.service.market(uid)['requirements']
-        proposed=self.service.intelligence.roadmap(profile,state['messages'],requirements,self.service.skills(uid))
-        if len(set(proposed.focus_skills))!=len(proposed.focus_skills) or not set(proposed.focus_skills)<={r['skill'] for r in requirements}:
-            raise ValueError('The roadmap included unsupported role requirements. Please retry.')
+                                       'goal_confirmed':True,'claimed_skills':list(dict.fromkeys(c['skill'] for c in state['claims']))}).model_dump()
+        role_jobs=jobs_for_role(self.service.jobs(),profile['target_role'])
+        role_requirements=requirements(role_jobs)
+        proposed=self.service.intelligence.roadmap(profile,state['messages'],role_requirements,self.service.skills(uid))
         skill=proposed.focus_skills[0]
-        generated=self.service.intelligence.skill_path(profile,skill,requirements)
+        generated=self.service.intelligence.skill_path(profile,skill,role_requirements)
         path={'skill':skill,'revision':0,'evaluation_id':state['id'],'rationale':generated.rationale,
               'competencies':[{**c.model_dump(),'id':f"{skill}:{state['id']}-{i+1}",'skill':skill} for i,c in enumerate(generated.competencies)]}
         saved={'goal':{k:profile[k] for k in ['current_role','target_role','career_goal']},'requested':True,
-               'evaluation_id':state['id'],'focus_skills':proposed.focus_skills,'summary':proposed.summary}
+               'evaluation_id':state['id'],'market_role_covered':bool(role_jobs),'market_job_ids':[j['id'] for j in role_jobs],'focus_skills':proposed.focus_skills,'summary':proposed.summary}
         writes=[item(pk,'PROFILE',profile),item(pk,self.KEY,{**state,'status':'completed','revision':revision+1}),
                 item(pk,'CAREER_PATH#active',saved),item(pk,f'PATH#{skill}',path),item(pk,'ACTIVITY#active',{})]
         # Archive generated content before replacing it; attempt/evidence records are never rewritten.

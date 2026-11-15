@@ -15,9 +15,9 @@ class SignupRequest(LoginRequest):
     password: SecretStr = Field(min_length=8, max_length=128)
     name: str = Field(min_length=1, max_length=80)
     role: Literal["candidate", "employer"] = "candidate"
-    current_role: str = Field(default="Getting started", min_length=1, max_length=120)
-    target_role: str = Field(default="AI Engineer", min_length=1, max_length=120)
-    candidate_track: Literal["career_switcher", "student", "experienced"] = "career_switcher"
+    current_role: str = Field(default="", min_length=0, max_length=120)
+    target_role: str = Field(default="", min_length=0, max_length=120)
+    candidate_track: Literal["career_switcher", "student", "experienced", "unspecified"] = "unspecified"
     claimed_skills: list[str] = Field(default_factory=list, max_length=20)
 
     @field_validator("claimed_skills")
@@ -29,11 +29,11 @@ class SignupRequest(LoginRequest):
 
 class ProfileUpdate(Contract):
     name: str = Field(min_length=1, max_length=80)
-    current_role: str = Field(min_length=1, max_length=120)
-    target_role: str = Field(min_length=1, max_length=120)
+    current_role: str = Field(min_length=0, max_length=120)
+    target_role: str = Field(min_length=0, max_length=120)
     claimed_skills: list[str] = Field(max_length=20)
     marketplace_opt_in: bool = False
-    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers", "unspecified"] = "unspecified"
 
     @field_validator("claimed_skills")
     @classmethod
@@ -46,8 +46,9 @@ class Profile(ProfileUpdate):
     id: str
     role: Literal["candidate", "employer"]
     synthetic: bool = True
-    candidate_track: Literal["career_switcher", "student", "experienced", "employer"] = "career_switcher"
+    candidate_track: Literal["career_switcher", "student", "experienced", "employer", "unspecified"] = "unspecified"
     onboarding_completed: bool = True
+    goal_confirmed: bool = False
     education_level: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=30)
     expertise_level: Literal["Beginner", "Intermediate", "Advanced", "Expert"] | None = None
@@ -62,7 +63,7 @@ class AccountSession(Contract):
 class JobCreate(Contract):
     title: str = Field(min_length=3, max_length=120)
     company: str = Field(min_length=2, max_length=100)
-    location: str = Field(default="Remote", max_length=100)
+    location: str = Field(default="Not specified", max_length=100)
     description: str = Field(min_length=20, max_length=12000)
     required_skills: list[str] = Field(default_factory=list, max_length=20)
     career_level: Literal["internship", "entry", "mid", "senior", "unspecified"] = "unspecified"
@@ -89,8 +90,8 @@ class Job(JobCreate):
 
 
 class AssessmentCreate(Contract):
-    skill: str = Field(default="python", max_length=50)
-    competency_id: str | None = Field(default=None, max_length=80)
+    skill: str = Field(min_length=1, max_length=50)
+    competency_id: str | None = Field(default=None, max_length=130)
 
 
 class Submission(Contract):
@@ -245,7 +246,7 @@ class CandidateMatch(Contract):
     current_role: str
     target_role: str
     synthetic: bool
-    candidate_track: Literal["career_switcher", "student", "experienced", "employer"]
+    candidate_track: Literal["career_switcher", "student", "experienced", "employer", "unspecified"]
     supported: list[str]
     missing: list[str]
     supported_count: int
@@ -299,12 +300,12 @@ class SkillClaim(Contract):
 
 class OnboardingTurn(Contract):
     question: str = Field(min_length=10, max_length=600)
-    current_role: str = Field(min_length=1, max_length=120)
-    target_role: str = Field(min_length=1, max_length=120)
-    candidate_track: Literal["career_switcher", "student", "experienced"]
+    current_role: str = Field(min_length=0, max_length=120)
+    target_role: str = Field(min_length=0, max_length=120)
+    candidate_track: Literal["career_switcher", "student", "experienced", "unspecified"]
     claims: list[SkillClaim] = Field(default_factory=list, max_length=20)
     ready_to_review: bool
-    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers", "unspecified"] = "unspecified"
 
 
 class OnboardingAnswer(Contract):
@@ -331,7 +332,7 @@ class OnboardingState(Contract):
     current_role: str
     target_role: str
     candidate_track: str
-    career_goal: Literal["stay_relevant", "find_job", "switch_careers"] = "switch_careers"
+    career_goal: Literal["stay_relevant", "find_job", "switch_careers", "unspecified"] = "unspecified"
 
 
 class GeneratedQuestion(Question):
@@ -428,6 +429,7 @@ class LearningSkill(Contract):
 
 
 class LearningRecord(Contract):
+    market_role_covered: bool = False
     evaluation_id: str | None = None
     summary: str | None = None
     target_role: str
@@ -454,5 +456,18 @@ class LearningEvaluation(OnboardingState):
 
 
 class GeneratedRoadmap(Contract):
+    @field_validator('focus_skills')
+    @classmethod
+    def valid_focus_skills(cls, values):
+        from backend.tools.jobs import normalize_skills
+        normalized=normalize_skills(values)
+        if len(normalized)!=len(values):raise ValueError('Choose distinct learning skills')
+        return normalized
+
     focus_skills: list[str] = Field(min_length=1, max_length=6)
     summary: str = Field(min_length=10, max_length=1000)
+
+
+class LearningEvaluationAnswer(OnboardingAnswer):
+    target_role: str | None = Field(default=None, min_length=1, max_length=120)
+    career_goal: Literal['stay_relevant','find_job','switch_careers'] | None = None

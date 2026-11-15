@@ -1,6 +1,6 @@
 """One saved career path, with private competency content and derived evidence."""
 from backend.db import item, Conflict
-from backend.tools.jobs import normalize_skills, skill_label
+from backend.tools.jobs import normalize_skills, skill_label, requirements
 from backend.models import LearningRecord, PassportRecord, SkillEvidence
 
 
@@ -8,17 +8,20 @@ class Learning:
     def __init__(self,service):
         self.service,self.repo=service,service.repo
 
+    def requirements(self,uid):
+        saved=self.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}
+        if 'market_job_ids' not in saved:return self.service.market(uid)['requirements']
+        return requirements([j for j in self.service.jobs() if j['id'] in saved['market_job_ids']])
+
     def plan(self,uid,*,preview=False):
         profile=self.service.profile(uid)
         pk=f"USER#{uid}"
-        market=self.service.market(uid)["requirements"]
-        if profile["candidate_track"]=="student":
-            order={"python":0,"sql":1,"llm":2}
-            market.sort(key=lambda r:(order.get(r["skill"],3),-r["job_count"]))
+        market=self.requirements(uid)
         goal={k:profile[k] for k in ["current_role","target_role","career_goal"]}
         saved=self.repo.get(pk,"CAREER_PATH#active")
         # Older page loads saved generic shortlists. They are not user-created plans.
         started = bool(saved and (saved.get('requested') or self.repo.partition(pk,'PATH#')))
+        if not profile['synthetic'] and not profile['goal_confirmed']:started=False
         if not started and not preview:
             return LearningRecord(target_role=profile['target_role'],career_goal=profile['career_goal'],
                                   skills=[],next_topic=None,activity=None,completed_topics=0,total_topics=0,
@@ -55,12 +58,15 @@ class Learning:
                            "rationale":path["rationale"] if path else "Explore focused competencies connected to this career goal.",
                            "expanded":path is not None,"topics":topics,
                            "mastery":"foundational" if evidence.get(skill,{}).get("passed") else "not_assessed"})
-        return LearningRecord(evaluation_id=saved.get("evaluation_id"),summary=saved.get("summary"),target_role=saved["goal"]["target_role"],career_goal=saved["goal"]["career_goal"],skills=skills,next_topic=next_topic,
+        return LearningRecord(market_role_covered=saved.get("market_role_covered",False),evaluation_id=saved.get("evaluation_id"),summary=saved.get("summary"),target_role=saved["goal"]["target_role"],career_goal=saved["goal"]["career_goal"],skills=skills,next_topic=next_topic,
                               activity=(self.repo.get(pk,"ACTIVITY#active") or None),completed_topics=sum(t["status"]=="completed" for s in skills for t in s["topics"]),
                               total_topics=sum(len(s["topics"]) for s in skills),
                               note="Knowledge and scenario checks support foundational evidence. Applied and demonstrated levels require practical evidence and are not awarded by quizzes.").model_dump()
 
     def expand(self,uid,skill):
+        profile=self.service.profile(uid)
+        if not profile['synthetic'] and not profile['goal_confirmed']:
+            raise Conflict('Choose and confirm your career goal in profile evaluation first.')
         skill=normalize_skills([skill])[0]
         plan=self.plan(uid,preview=True)
         if skill not in {s["skill"] for s in plan["skills"]}:
@@ -69,7 +75,7 @@ class Learning:
         saved=self.repo.get(pk,'CAREER_PATH#active') or {}
         existing=self.repo.get(pk,sk)
         if not existing or existing.get('evaluation_id')!=saved.get('evaluation_id'):
-            generated=self.service.intelligence.skill_path(self.service.profile(uid),skill,self.service.market(uid)["requirements"][:8])
+            generated=self.service.intelligence.skill_path(self.service.profile(uid),skill,self.requirements(uid)[:8])
             data={"skill":skill,"evaluation_id":saved.get("evaluation_id"),"revision":0,"rationale":generated.rationale,"competencies":[
                 {**c.model_dump(),"id":f"{skill}:{saved['evaluation_id']}-{i+1}" if saved.get("evaluation_id") else f"{skill}:{i+1}","skill":skill} for i,c in enumerate(generated.competencies)]}
             try:
@@ -120,7 +126,9 @@ class Learning:
         self.repo.write([item(f"USER#{uid}","ACTIVITY#active",data)])
 
     def next_assessment(self,uid):
-        plan=self.start(uid)
+        if (not self.service.profile(uid)['goal_confirmed'] and not self.service.profile(uid)['synthetic']) or not (self.repo.get(f'USER#{uid}','CAREER_PATH#active') or {}).get('evaluation_id'):
+            raise Conflict('Evaluate your profile and choose a goal before requesting the next assessment.')
+        plan=self.plan(uid)
         topic=plan["next_topic"]
         if topic:
             return self.service.create_assessment(uid,topic["skill"],competency_id=topic["id"])
@@ -129,7 +137,8 @@ class Learning:
             expanded=self.expand(uid,missing["skill"])
             topic=next(s for s in expanded["skills"] if s["skill"]==missing["skill"])["topics"][0]
             return self.service.create_assessment(uid,topic["skill"],competency_id=topic["id"])
-        return self.service.create_assessment(uid,plan["skills"][0]["skill"] if plan["skills"] else "python")
+        if not plan['skills']:raise ValueError('Create a personal roadmap or choose a skill explicitly.')
+        return self.service.create_assessment(uid,plan["skills"][0]["skill"])
 
     def passport(self,uid):
         skills=[SkillEvidence.model_validate({**e,"mastery":"foundational" if e["passed"] else "not_assessed"}).model_dump() for e in self.service.skills(uid)]
