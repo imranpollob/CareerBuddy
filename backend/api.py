@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import logging
+import os
 from threading import Lock
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -37,6 +38,11 @@ class Session:
 
 def create_app(repo=None, settings=None):
     load_dotenv()
+    # Workshop credentials rotate: the AWS keys in .env must win over stale ones
+    # exported in the shell. Other settings keep shell precedence (dev.sh sets them).
+    for key, value in dotenv_values().items():
+        if key.startswith("AWS_") and value:
+            os.environ[key] = value
     settings = settings or Settings()
     if repo is None:
         repo = MemoryRepository() if settings.repository == "memory" else DynamoRepository(
