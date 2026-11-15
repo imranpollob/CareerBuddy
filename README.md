@@ -1,12 +1,18 @@
 # CareerBuddy
 
-**Resumes are claims. CareerBuddy turns them into evidence.**
+CareerBuddy helps people reach their career goals by 
+- Identifying the skills employers currently demand
+- Comparing them with what each person can already do
+- Closing the gap with 
+  - Personalized learning paths, 
+  - AI-generated lessons and 
+  - Server-graded assessments. 
+  
+Passed assessments become a verifiable **Skill Passport** that is matched against real job requirements, and employers discover consenting candidates by assessment-backed skills rather than resumes.
 
-CareerBuddy helps people reach their career goals by identifying the skills employers currently demand, comparing them with what each person can already do, and closing the gap with personalized learning paths, AI-generated lessons and server-graded assessments. Passed assessments become a verifiable **Skill Passport** that is matched against real job requirements, and employers discover consenting candidates by assessment-backed skills rather than resumes.
+Built with Amazon Bedrock (Nova 2 Lite), Amazon Bedrock AgentCore Runtime, Amazon DynamoDB, Strands Agents, FastAPI and React.
 
-Built for the **AWS BuilderWars Hackathon (AI Infrastructure track)** with Amazon Bedrock (Nova 2 Lite), Amazon Bedrock AgentCore Runtime, Amazon DynamoDB, Strands Agents, FastAPI and React.
-
-| | |
+|Work| Stat|
 |---|---|
 | Live job data | **181** real postings from **24** employers (Greenhouse + Ashby public APIs) |
 | Skill intelligence | **1,599** source-grounded skill tags across **304** skills, tagged by Bedrock |

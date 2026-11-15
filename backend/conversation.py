@@ -12,6 +12,19 @@ def model_messages(record):
     return [{"role":m["role"],"content":[{"text":m["text"]}]} for m in record["messages"][-12:]]
 
 
+def clear(repo,uid):
+    """Start a new conversation. Learning, assessments and evidence are untouched.
+    The revision moves forward so a reply still in flight cannot overwrite the reset."""
+    pk,sk=f"USER#{uid}","CHAT#active"
+    record=history(repo,uid)
+    data=ConversationRecord(revision=record["revision"]+1,messages=[]).model_dump()
+    if repo.get(pk,sk) is None:
+        repo.write([item(pk,sk,data)],absent=(pk,sk))
+    else:
+        repo.write([item(pk,sk,data)],expected_revision=(pk,sk,record["revision"]))
+    return data
+
+
 def append(repo,uid,record,message,response):
     pk,sk=f"USER#{uid}","CHAT#active"
     saved=repo.get(pk,sk)

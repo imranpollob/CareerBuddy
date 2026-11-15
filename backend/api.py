@@ -293,6 +293,12 @@ def create_app(repo=None, settings=None):
     def chat_history(session=Depends(authenticated)):
         return conversation.history(repo,session.uid)
 
+    @app.post("/api/chat/clear",response_model=ConversationRecord)
+    def chat_clear(session=Depends(authenticated)):
+        # The AgentCore Runtime reads history from the same table, so it starts fresh too.
+        with session.lock:
+            return conversation.clear(repo,session.uid)
+
     runtime_client = None
 
     def invoke_runtime(uid, token, message):

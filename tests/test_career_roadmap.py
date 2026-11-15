@@ -146,3 +146,20 @@ def test_parallel_topic_submissions_preserve_complete_skill_evidence(candidate,r
         assert all(a['status']=='completed' for a in pool.map(submit,attempts))
     evidence=next(e for e in service.skills(uid) if e['skill']==skill)
     assert evidence['passed'] and len(evidence['assessment_ids'])==3
+
+
+def test_new_chat_clears_only_the_conversation(candidate):
+    candidate.post('/api/chat',json={'message':'Hello, I want to plan my career'})
+    passport_before=candidate.get('/api/passport').json()
+    cleared=candidate.post('/api/chat/clear').json()
+    assert cleared['messages']==[] and cleared['revision']==2
+    assert candidate.get('/api/chat/history').json()==cleared
+    # Learning evidence is untouched, and the next message starts a fresh, saved conversation.
+    assert candidate.get('/api/passport').json()==passport_before
+    candidate.post('/api/chat',json={'message':'Start again'})
+    history=candidate.get('/api/chat/history').json()
+    assert [m['text'] for m in history['messages']][0]=='Start again' and history['revision']==3
+
+
+def test_new_chat_works_before_any_message(candidate):
+    assert candidate.post('/api/chat/clear').json()=={'revision':1,'messages':[]}
