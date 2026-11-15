@@ -8,7 +8,7 @@ class Learning:
     def __init__(self,service):
         self.service,self.repo=service,service.repo
 
-    def plan(self,uid):
+    def plan(self,uid,*,preview=False):
         profile=self.service.profile(uid)
         pk=f"USER#{uid}"
         market=self.service.market(uid)["requirements"]
@@ -17,9 +17,15 @@ class Learning:
             market.sort(key=lambda r:(order.get(r["skill"],3),-r["job_count"]))
         goal={k:profile[k] for k in ["current_role","target_role","career_goal"]}
         saved=self.repo.get(pk,"CAREER_PATH#active")
+        # Older page loads saved generic shortlists. They are not user-created plans.
+        started = bool(saved and (saved.get('requested') or self.repo.partition(pk,'PATH#')))
+        if not started and not preview:
+            return LearningRecord(target_role=profile['target_role'],career_goal=profile['career_goal'],
+                                  skills=[],next_topic=None,activity=None,completed_topics=0,total_topics=0,
+                                  note='Create your learning roadmap when you are ready.').model_dump()
         if not saved or saved["goal"]!=goal:
             saved={"goal":goal,"focus_skills":[r["skill"] for r in market[:6]]}
-            self.repo.write([item(pk,"CAREER_PATH#active",saved)])
+            if not preview:self.repo.write([item(pk,"CAREER_PATH#active",saved)])
         else:
             # Preserve paths the user opened while letting new demand refresh
             # the remaining focus slots. Evidence/history always stays intact.
@@ -27,7 +33,7 @@ class Learning:
             focus=list(dict.fromkeys(started+[r["skill"] for r in market]))[:6]
             if focus!=saved["focus_skills"]:
                 saved={**saved,"focus_skills":focus}
-                self.repo.write([item(pk,"CAREER_PATH#active",saved)])
+                if not preview:self.repo.write([item(pk,"CAREER_PATH#active",saved)])
         frequencies={r["skill"]:r["job_count"] for r in market}
         evidence={e["skill"]:e for e in self.service.skills(uid)}
         skills=[]
@@ -50,12 +56,12 @@ class Learning:
                            "mastery":"foundational" if evidence.get(skill,{}).get("passed") else "not_assessed"})
         return LearningRecord(target_role=profile["target_role"],career_goal=profile["career_goal"],skills=skills,next_topic=next_topic,
                               activity=self.repo.get(pk,"ACTIVITY#active"),completed_topics=sum(t["status"]=="completed" for s in skills for t in s["topics"]),
-                              total_topics=3*len(skills),
+                              total_topics=sum(len(s["topics"]) for s in skills),
                               note="Knowledge and scenario checks support foundational evidence. Applied and demonstrated levels require practical evidence and are not awarded by quizzes.").model_dump()
 
     def expand(self,uid,skill):
         skill=normalize_skills([skill])[0]
-        plan=self.plan(uid)
+        plan=self.plan(uid,preview=True)
         if skill not in {s["skill"] for s in plan["skills"]}:
             raise ValueError("Choose a skill in your career roadmap")
         pk,sk=f"USER#{uid}",f"PATH#{skill}"
@@ -64,10 +70,21 @@ class Learning:
             data={"skill":skill,"revision":0,"rationale":generated.rationale,"competencies":[
                 {**c.model_dump(),"id":f"{skill}:{i+1}","skill":skill} for i,c in enumerate(generated.competencies)]}
             try:
-                self.repo.write([item(pk,sk,data)],absent=(pk,sk))
+                self.repo.write([item(pk,sk,data),item(pk,'CAREER_PATH#active',{
+                    'requested':True,'goal':{k:self.service.profile(uid)[k] for k in ['current_role','target_role','career_goal']},
+                    'focus_skills':[s['skill'] for s in plan['skills']]})],absent=(pk,sk))
             except Conflict:
                 pass
         return self.plan(uid)
+
+    def start(self,uid):
+        plan=self.plan(uid)
+        if plan['skills']:
+            return plan
+        preview=self.plan(uid,preview=True)
+        if not preview['skills']:
+            raise ValueError('No role requirements are available to create a roadmap yet.')
+        return self.expand(uid,preview['skills'][0]['skill'])
 
     def competency(self,uid,cid):
         skill=normalize_skills([cid.rsplit(":",1)[0]])[0]
@@ -100,7 +117,7 @@ class Learning:
         self.repo.write([item(f"USER#{uid}","ACTIVITY#active",data)])
 
     def next_assessment(self,uid):
-        plan=self.plan(uid)
+        plan=self.start(uid)
         topic=plan["next_topic"]
         if topic:
             return self.service.create_assessment(uid,topic["skill"],competency_id=topic["id"])

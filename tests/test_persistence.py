@@ -79,7 +79,7 @@ def test_competency_path_and_conversation_survive_repository_reload(repository):
     from backend.models import ChatResponse
     service=Service(repository,Settings(ai_mode="mock"));service.seed(include_samples=True)
     uid="candidate-demo"
-    skill=service.learning.plan(uid)["skills"][0]["skill"]
+    skill=service.learning.start(uid)["skills"][0]["skill"]
     path=service.learning.expand(uid,skill)
     topics=next(s for s in path["skills"] if s["skill"]==skill)["topics"]
     for topic in topics:

@@ -11,7 +11,7 @@ def pass_attempt(client,repo,uid,attempt,*,fail=False):
 
 
 def test_competency_progress_only_supports_skill_after_full_path(candidate,repo):
-    plan=candidate.get('/api/learning').json()
+    plan=candidate.post('/api/learning').json()
     skill=plan['skills'][0]['skill']
     expanded=candidate.post(f'/api/learning/{skill}/expand').json()
     path=next(s for s in expanded['skills'] if s['skill']==skill)
@@ -39,7 +39,7 @@ def test_competency_progress_only_supports_skill_after_full_path(candidate,repo)
 
 
 def test_learning_content_is_private_cached_and_goal_scoped(candidate,repo,monkeypatch):
-    plan=candidate.get('/api/learning').json();skill=plan['skills'][0]['skill']
+    plan=candidate.post('/api/learning').json();skill=plan['skills'][0]['skill']
     candidate.post(f'/api/learning/{skill}/expand')
     def should_not_generate(*args):
         raise AssertionError('Cached path must be reused')
@@ -106,7 +106,7 @@ def test_failed_chat_preserves_saved_history(candidate,monkeypatch):
 
 def test_market_refresh_keeps_opened_paths_and_updates_other_focus_slots(candidate,monkeypatch):
     service=candidate.app.state.service
-    first=service.learning.plan('candidate-demo')['skills'][0]['skill']
+    first=service.learning.start('candidate-demo')['skills'][0]['skill']
     service.learning.expand('candidate-demo',first)
     old_market=service.market
     def changed_market(uid=None):
@@ -117,14 +117,14 @@ def test_market_refresh_keeps_opened_paths_and_updates_other_focus_slots(candida
     refreshed=service.learning.plan('candidate-demo')
     assert refreshed['skills'][0]['skill']==first and refreshed['skills'][0]['expanded']
     assert any(s['skill']=='new_market_skill' for s in refreshed['skills'])
-    assert refreshed['total_topics']==18
+    assert refreshed['total_topics']==3
 
 
 def test_parallel_topic_submissions_preserve_complete_skill_evidence(candidate,repo):
     from concurrent.futures import ThreadPoolExecutor
     from backend.db import Conflict
     service=candidate.app.state.service;uid='candidate-demo'
-    skill=service.learning.plan(uid)['skills'][0]['skill']
+    skill=service.learning.start(uid)['skills'][0]['skill']
     topics=service.learning.expand(uid,skill)['skills'][0]['topics']
     attempts=[service.create_assessment(uid,skill,competency_id=t['id']) for t in topics]
     def submit(a):

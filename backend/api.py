@@ -205,6 +205,10 @@ def create_app(repo=None, settings=None):
     def learning_plan(session=Depends(candidate)):
         return service.learning.plan(session.uid)
 
+    @app.post("/api/learning",response_model=LearningRecord)
+    def create_learning_plan(session=Depends(candidate)):
+        return service.learning.start(session.uid)
+
     @app.post("/api/learning/{skill}/expand",response_model=LearningRecord)
     def expand_learning(skill:str,session=Depends(candidate)):
         return service.learning.expand(session.uid,skill)

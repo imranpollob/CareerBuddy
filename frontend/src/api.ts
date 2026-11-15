@@ -37,7 +37,7 @@ export interface Lesson { skill: string; title: string; content: string; exercis
 export interface Candidate { id: string; name: string; current_role: string; target_role: string; synthetic: boolean; candidate_track: CandidateTrack; supported: string[]; missing: string[]; supported_count: number; required_count: number; evidence: Evidence[]; explanation: string }
 export interface Health { ai_mode: 'mock' | 'bedrock'; repository: string; model_id: string; persistence: string }
 export interface ChatResponse { message: string; mode: 'mock' | 'bedrock'; delegations: {specialist: string; tools: string[]; result: {summary: string; data: Record<string, unknown>}}[] }
-export interface OnboardingState {revision:number;status:'interview'|'review'|'completed';mode:'mock'|'bedrock';question:string;messages:{role:'assistant'|'user';content:string}[];claims:{skill:string;label:string;evidence_excerpt:string}[];current_role:string;target_role:string;candidate_track:CandidateTrack;career_goal:CareerGoal}
+export interface OnboardingState {question_number:number;total_questions:number;options:string[];answers:Record<string,string|number>;revision:number;status:'interview'|'review'|'completed';mode:'mock'|'bedrock';question:string;messages:{role:'assistant'|'user';content:string}[];claims:{skill:string;label:string;evidence_excerpt:string}[];current_role:string;target_role:string;candidate_track:CandidateTrack;career_goal:CareerGoal}
 export interface Topic {id:string;skill:string;title:string;objective:string;format:'knowledge'|'scenario';status:'available'|'current'|'completed'|'practice_needed';lesson_completed:boolean;evidence:(Evidence&{id:string;title:string})|null}
 export interface LearningPlan {target_role:string;career_goal:CareerGoal;skills:{skill:string;label:string;job_count:number;rationale:string;expanded:boolean;topics:Topic[];mastery:string}[];next_topic:Topic|null;activity:{kind:'lesson'|'assessment';competency_id?:string;assessment_id?:string;skill:string;title:string}|null;completed_topics:number;total_topics:number;note:string}
 export interface Passport {skills:Evidence[];competencies:(Evidence&{id:string;title:string})[];assessments:Assessment[];strengths:string[];next_steps:string[];note:string}
@@ -55,7 +55,18 @@ export class ApiError extends Error { constructor(message: string, public status
 export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {method, credentials:'include', headers: body === undefined ? {} : {'Content-Type':'application/json'}, body: body === undefined ? undefined : JSON.stringify(body)})
   const data = await response.json().catch(() => ({detail: 'The backend did not return a valid response.'}))
-  if (!response.ok) throw new ApiError(typeof data.detail === 'string' ? data.detail : 'Please check the form fields and try again.',response.status)
+  if (!response.ok) {
+    let message = typeof data.detail === 'string' ? data.detail : 'Please check the form fields and try again.'
+    if (Array.isArray(data.detail)) {
+      const errors = data.detail.map((issue: {loc?: (string | number)[]; msg?: string; type?: string; ctx?: {min_length?: number}}) => {
+        const field = issue.loc?.filter(part => part !== 'body').join(' ')
+        if (field === 'password' && issue.type === 'too_short' && issue.ctx?.min_length) return `Password must be at least ${issue.ctx.min_length} characters.`
+        return issue.msg ? `${field ? field.charAt(0).toUpperCase() + field.slice(1) + ': ' : ''}${issue.msg}` : ''
+      }).filter(Boolean)
+      if (errors.length) message = errors.join(' ')
+    }
+    throw new ApiError(message,response.status)
+  }
   return data as T
 }
 

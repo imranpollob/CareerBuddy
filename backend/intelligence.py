@@ -87,6 +87,7 @@ class Intelligence:
             return GeneratedAssessment(skill=skill,context_summary=f"Offline fixture for {profile['current_role']} targeting {profile['target_role']}",questions=questions)
         result=self.generate("assessment",GeneratedAssessment,
             "Create exactly FOUR ORIGINAL, objective multiple-choice questions for the requested skill, personalized to the user's project history and target role. "
+            "Adapt difficulty and explanations to education_level, years_experience and expertise_level; these are self-reported context, never evidence of a skill. "
             "Use q1,q2,q3,q4 as IDs; each question has exactly four distinct options and exactly one objectively correct answer, correct_index 0–3. "
             "Include a clear explanation of the correct answer. Focus on practical fundamentals and realistic scenarios, not trivia or subjective opinions. "
             "Mark each question format as knowledge or scenario. Include at least two scenario questions. If a target_competency is supplied, assess ONLY its learning objective. "
@@ -120,6 +121,7 @@ class Intelligence:
                 {"title":f"Validate {skill_label(skill)} decisions","objective":f"Identify failure modes and validation strategies for {skill_label(skill)} in an AI project.","format":"scenario"}])
         result=self.generate("coach",GeneratedSkillPath,
             "Break the requested skill into exactly THREE specific progressive competencies for this person's career goal. "
+            "Adapt the starting level to education_level, years_experience and self-reported expertise_level without assuming verified skills. "
             "Each must have a distinct title, concrete learning objective and knowledge/scenario assessment format. "
             "These are objective knowledge checks, NOT proof of applied production work or project certification. "
             "Connect objectives to observed job requirements. Return only the requested skill.",

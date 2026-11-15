@@ -57,3 +57,26 @@ def test_cleanup_selects_only_known_fixture_users_and_their_derived_records():
     selected=selected_records(rows,{'candidate-demo','employer-demo'},{'sample-job'})
     assert len(selected)==7
     assert all(r not in selected for r in rows[7:])
+
+
+def test_new_account_reads_stay_empty_and_creation_is_private(client,repo,monkeypatch):
+    from backend.intelligence import GenerationError
+    signed=client.post('/api/auth/signup',json={'name':'Fresh','email':'fresh@example.com','password':'Fresh account password 2026!'})
+    uid=signed.json()['profile']['id'];pk=f'USER#{uid}'
+    # A legacy shortlist created by old GET requests must not appear as a plan.
+    repo.write([item(pk,'CAREER_PATH#active',{'goal':{k:signed.json()['profile'][k] for k in ['current_role','target_role','career_goal']},'focus_skills':['python']})])
+    for _ in range(2):
+        plan=client.get('/api/learning').json()
+        assert plan['skills']==[] and plan['total_topics']==0
+        assert client.get('/api/passport').json()['assessments']==[]
+    def unavailable(*args):raise GenerationError('Unavailable')
+    ai=client.app.state.service.intelligence
+    original=ai.skill_path
+    monkeypatch.setattr(ai,'skill_path',unavailable)
+    assert client.post('/api/learning').status_code==503
+    assert client.get('/api/learning').json()['skills']==[]
+    monkeypatch.setattr(ai,'skill_path',original)
+    assert client.post('/api/learning').json()['total_topics']==3
+    client.login('student')
+    assert client.get('/api/learning').json()['skills']==[]
+    assert client.get('/api/passport').json()['assessments']==[]

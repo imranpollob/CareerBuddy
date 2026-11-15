@@ -9,6 +9,7 @@ export type HomeAction=ActionDetails&(
  |{kind:'build';skill:string}
  |{kind:'skill-check';skill:string}
  |{kind:'jobs'}
+ |{kind:'create'}
 )
 export function getNextAction(data:Dashboard,plan:LearningPlan):HomeAction{
  const pending=data.assessments.filter(a=>a.status==='pending').sort((a,b)=>b.created_at.localeCompare(a.created_at))
@@ -21,6 +22,7 @@ export function getNextAction(data:Dashboard,plan:LearningPlan):HomeAction{
   if(topic.lesson_completed&&topic.status!=='practice_needed')return {kind:'assess',topic,title:`Check your understanding of ${topic.title}`,description:'You have practiced this topic. A short objective check can record what you understand.',label:'Take the competency check'}
   return {kind:'lesson',topic,title:topic.title,description:topic.status==='practice_needed'?'Use your latest feedback to revisit the concepts, practice, and try again.':'A focused lesson and a practical exercise are your next steps toward this competency.',label:topic.status==='practice_needed'?'Review lesson':'Start lesson'}
  }
+ if(!plan.skills.length)return {kind:'create',title:'Your workspace is ready',description:'Create a personal learning roadmap when you are ready to begin.',label:'Create my roadmap'}
  const missing=plan.skills.find(s=>s.mastery!=='foundational')
  if(missing?.expanded)return {kind:'skill-check',skill:missing.skill,title:`Refresh your ${missing.label} evidence`,description:'Your competency path is complete. Recheck your broader understanding to update your current skill evidence.',label:'Reassess skill'}
  if(missing)return {kind:'build',skill:missing.skill,title:`Build confidence in ${missing.label}`,description:'Open a three-step competency path connected to the skills in your target job sample.',label:'Build my learning path'}
@@ -42,6 +44,7 @@ export function HomePage({data,plan,passport,matches,busy,onAction,onLearning,on
  const sample=realJobs.length?realJobs:matches
  const early=sample.filter(m=>['entry','internship'].includes(m.job.career_level))
  const opportunities=(data.profile.candidate_track==='student'&&early.length?early:sample).slice(0,3)
+ if(!plan.skills.length&&!data.assessments.length&&!passport.skills.length)return <div className="page-stack home-page"><div className="home-heading"><div><h1>Welcome, {data.profile.name.split(' ')[0]}.</h1><p>Your career journey starts here.</p></div></div><section className="card home-next-step"><div><p className="eyebrow">GET STARTED</p><h2>Your workspace is ready</h2><p className="home-next-description">No roadmap, assessments, or verified skills yet. Create your personal roadmap using your background and career goal.</p></div><button className="button primary" disabled={busy} onClick={()=>onAction(action)}>Create my roadmap<ArrowRight size={16}/></button></section><div className="home-snapshots"><section className="card"><h2>Learning roadmap</h2><p>Your roadmap will appear here after you create it.</p></section><section className="card"><h2>Skill Passport</h2><p>No assessments or verified skills yet.</p></section></div></div>
  return <div className="page-stack home-page">
   <div className="home-heading"><div><h1>Good to see you, {data.profile.name.split(' ')[0]}.</h1><p>{GOALS[data.profile.career_goal]}<span aria-hidden="true"> · </span><span>{data.profile.current_role}<ArrowRight size={13}/>{data.profile.target_role}</span></p></div><div className="home-heading-actions"><button className="text-button" onClick={onChat}><MessageCircle size={16}/>Ask CareerBuddy</button></div></div>
   <section className="card home-next-step" aria-labelledby="home-next-heading"><div><p className="eyebrow">YOUR NEXT STEP</p><h2 id="home-next-heading">{action.title}</h2><p className="home-next-description">{action.description}</p></div><button className="button primary" disabled={busy} onClick={()=>onAction(action)}>{action.label}<ArrowRight size={16}/></button></section>

@@ -13,17 +13,22 @@ def test_simple_signup_adaptive_onboarding_and_generated_assessment(client,repo)
     uid=new_candidate(client)
     state=client.get("/api/onboarding").json()
     assert state["revision"]==0 and state["status"]=="interview"
-    first=client.post("/api/onboarding/answer",json={"revision":0,"answer":"I am a computer science student. I built a Python and SQL project."}).json()
-    assert first["question"]!=state["question"]
-    assert {c["skill"] for c in first["claims"]}>={"python","sql"}
-    stale=client.post("/api/onboarding/answer",json={"revision":0,"answer":"Overwrite my profile"})
-    assert stale.status_code==409
-    second=client.post("/api/onboarding/answer",json={"revision":1,"answer":"I used FastAPI to serve Python predictions and tested SQL queries."}).json()
-    assert second["status"]=="review"
-    assert client.get("/api/dashboard").json()["skills"]==[]
-    profile=client.post("/api/onboarding/complete",json={"revision":2}).json()
-    assert profile["onboarding_completed"] is True and profile["candidate_track"]=="student"
-    assert set(profile["claimed_skills"])>={"python","sql","fastapi"}
+    answers=['Computer science student',"Bachelor’s degree",'0','Beginner']
+    for revision,answer in enumerate(answers):
+        assert state['question_number']==revision+1
+        assert state['total_questions']==4
+        if revision:
+            assert client.post('/api/onboarding/answer',json={'revision':0,'answer':answer}).status_code==409
+        response=client.post('/api/onboarding/answer',json={'revision':revision,'answer':answer})
+        assert response.status_code==200
+        state=response.json()
+    assert state['status']=='review' and state['claims']==[]
+    assert client.post('/api/onboarding/answer',json={'revision':4,'answer':'Extra'}).status_code==409
+    assert client.get('/api/dashboard').json()['skills']==[]
+    profile=client.post('/api/onboarding/complete',json={'revision':4}).json()
+    assert profile['onboarding_completed'] and profile['candidate_track']=='student'
+    assert profile['education_level']=="Bachelor’s degree" and profile['years_experience']==0
+    assert profile['expertise_level']=='Beginner' and profile['claimed_skills']==[]
     assessment=client.post("/api/assessments",json={"skill":"fastapi"}).json()
     assert assessment["kind"]=="mock_generated_v1"
     assert len(assessment["questions"])==4
@@ -37,17 +42,15 @@ def test_simple_signup_adaptive_onboarding_and_generated_assessment(client,repo)
     assert client.post(f"/api/assessments/{assessment['id']}/submit",json={"answers":answers}).status_code==409
 
 
-def test_onboarding_rejects_unsupported_claims_and_never_writes_scores(client,monkeypatch):
+def test_onboarding_validates_options_and_never_writes_scores(client):
     new_candidate(client)
-    client.get("/api/onboarding")
-    def hallucinated(*args):
-        return OnboardingTurn(question="Can you explain your project?",current_role="Engineer",target_role="AI Engineer",candidate_track="career_switcher",ready_to_review=False,
-                              claims=[{"skill":"rust","label":"Rust","evidence_excerpt":"I built production Rust systems"}])
-    monkeypatch.setattr(client.app.state.service.intelligence,"interview",hallucinated)
-    response=client.post("/api/onboarding/answer",json={"revision":0,"answer":"I only know Python"})
-    assert response.status_code==400
-    assert client.get("/api/onboarding").json()["revision"]==0
-    assert client.get("/api/dashboard").json()["skills"]==[]
+    client.get('/api/onboarding')
+    assert client.post('/api/onboarding/complete',json={'revision':0}).status_code==409
+    client.post('/api/onboarding/answer',json={'revision':0,'answer':'Engineer'})
+    for answer in ['Made up degree','Expert','31']:
+        assert client.post('/api/onboarding/answer',json={'revision':1,'answer':answer}).status_code==400
+    assert client.get('/api/onboarding').json()['revision']==1
+    assert client.get('/api/dashboard').json()['skills']==[]
 
 
 def test_generated_grading_is_immutable_after_profile_changes(candidate,repo):
@@ -85,10 +88,9 @@ def test_generation_failure_preserves_interview_and_creates_no_attempt(candidate
     assert repo.partition("USER#candidate-demo","ASSESSMENT#")==[]
     assert repo.partition("USER#candidate-demo","ASSESSMENT_KEY#")==[]
     new_candidate(candidate)
-    before=candidate.get("/api/onboarding").json()
-    monkeypatch.setattr(candidate.app.state.service.intelligence,"interview",unavailable)
-    assert candidate.post("/api/onboarding/answer",json={"revision":0,"answer":"I built Python projects"}).status_code==503
-    assert candidate.get("/api/onboarding").json()==before
+    # Background questions work even when the model is unavailable.
+    monkeypatch.setattr(candidate.app.state.service.intelligence,'interview',unavailable)
+    assert candidate.post('/api/onboarding/answer',json={'revision':0,'answer':'Software engineer'}).status_code==200
 
 
 def test_private_interview_labels_do_not_leak_to_other_accounts(candidate,repo):

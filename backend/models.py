@@ -48,6 +48,9 @@ class Profile(ProfileUpdate):
     synthetic: bool = True
     candidate_track: Literal["career_switcher", "student", "experienced", "employer"] = "career_switcher"
     onboarding_completed: bool = True
+    education_level: str | None = None
+    years_experience: int | None = Field(default=None, ge=0, le=30)
+    expertise_level: Literal["Beginner", "Intermediate", "Advanced", "Expert"] | None = None
 
 
 class AccountSession(Contract):
@@ -313,6 +316,11 @@ class OnboardingConfirm(Contract):
 
 
 class OnboardingState(Contract):
+    flow_version: int = 1
+    question_number: int = 1
+    total_questions: int = 4
+    options: list[str] = Field(default_factory=list)
+    answers: dict[str, str | int] = Field(default_factory=dict)
     revision: int
     status: Literal["interview", "review", "completed"]
     mode: Literal["mock", "bedrock"]

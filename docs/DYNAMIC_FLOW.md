@@ -2,13 +2,18 @@
 
 ## Signup and skill discovery
 
-Signup collects name, email, password and candidate/employer purpose. New candidates enter conversational onboarding. The Strands orchestrator uses Bedrock to ask one question at a time, adapting to previous answers. It discovers role, goal, projects and tools rather than requiring a fixed skill list.
+Signup collects name, email, password and candidate/employer purpose. Candidates answer exactly four numbered questions: current role, highest education, work experience (0–30 years), and self-reported expertise (Beginner, Intermediate, Advanced, Expert). Education uses standard predefined choices. A review screen confirms the answers without asking additional questions.
 
-After two to six answers, the candidate reviews proposed skills with supporting answer excerpts. Every excerpt must occur in the supplied answers. Confirmation accepts only a revision number, then atomically saves server-held claims and profile. A stale browser cannot overwrite a newer conversation. Claimed skills are editable context and never assessment evidence. Conversations and private labels remain owner-scoped.
+The server validates choices, persists progress and rejects stale revisions or a fifth answer. Confirmation saves the background fields to the signed-in profile atomically. Background does not create skill claims or assessment evidence. These questions need no model inference, so onboarding remains available during a model outage. Incomplete older interviews restart in the bounded flow; completed profiles remain unchanged.
+
+New accounts start with empty Home and Learning views, zero verified skills and no assessment attempts. GET /learning never initializes a plan for a fresh user. Older automatic shortlists with no generated paths remain hidden. Completing onboarding saves background only; it does not launch an assessment.
+
+The explicit Create my roadmap action calls POST /learning, selects target-role requirements and generates the first personalized competency path through Coach. Generation failure leaves the account empty and retryable. Detailed content remains user-scoped. Progress totals count only generated competencies, rather than assuming three for every suggested skill. Public postings remain available on the Jobs page; they are shared job-market data, not another candidate’s history.
+
 
 ## Personalized assessment and coaching
 
-After confirmation, Assessment uses a short-lived Strands invocation with role, claims, project excerpts, target requirements and prior prompts to create four original objective questions. Pydantic validates topic, IDs, distinct options, answer indices and explanations. A pending attempt and separate private key are written together only after generation succeeds.
+After confirmation, Assessment uses a short-lived Strands invocation with profile background, target requirements and prior prompts to create four original objective questions. Pydantic validates topic, IDs, distinct options, answer indices and explanations. A pending attempt and separate private key are written together only after generation succeeds.
 
 The browser receives questions and choices, never the key. Submission supplies choices only. Python grades against the stored key, writes the result and current skill evidence atomically, and rejects replay. A 75% pass supplies limited knowledge-check evidence. Users cannot supply scores or directly alter evidence. Model-authored questions can be imperfect; these checks are not certification.
 
