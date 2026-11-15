@@ -55,6 +55,7 @@ def create_app(repo=None, settings=None):
     app = FastAPI(title="CareerBuddy", version="0.2.0", lifespan=lifespan)
     app.state.service = service
     app.state.auth = auth
+    app.state.settings = settings
     app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=True,
                        allow_methods=["GET", "POST", "PATCH"], allow_headers=["Content-Type"])
 
@@ -292,8 +293,32 @@ def create_app(repo=None, settings=None):
     def chat_history(session=Depends(authenticated)):
         return conversation.history(repo,session.uid)
 
+    runtime_client = None
+
+    def invoke_runtime(uid, token, message):
+        """Run the agent on AgentCore Runtime; the runtime re-validates the session itself."""
+        nonlocal runtime_client
+        import json
+        import boto3
+        from botocore.config import Config as BotoConfig
+        if runtime_client is None:
+            runtime_client = boto3.client("bedrock-agentcore", config=BotoConfig(read_timeout=120, retries={"max_attempts": 1}))
+        result = runtime_client.invoke_agent_runtime(
+            agentRuntimeArn=settings.agent_runtime_arn, qualifier="DEFAULT",
+            runtimeSessionId=f"careerbuddy-session-{uid}".ljust(33, "0")[:100],  # one warm session per user
+            payload=json.dumps({"message": message, "session_token": token}).encode())
+        body = result["response"].read() if hasattr(result["response"], "read") else b"".join(result["response"])
+        return ChatResponse.model_validate(json.loads(body))
+
     @app.post("/api/chat", response_model=ChatResponse)
-    def chat_endpoint(body: ChatRequest, session=Depends(authenticated)):
+    def chat_endpoint(body: ChatRequest, request: Request, session=Depends(authenticated)):
+        if settings.agent_runtime_arn:
+            with session.lock:
+                try:
+                    return invoke_runtime(session.uid, request.cookies.get("skillpilot_session"), body.message)
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("AgentCore runtime request failed: %s", type(exc).__name__)
+                    raise HTTPException(503, "The AI service could not complete this request. Your evidence is safe. Retry or use the dashboard controls.") from exc
         with session.lock:
             saved_history=conversation.history(repo,session.uid)
             try:

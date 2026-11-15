@@ -13,4 +13,6 @@ class Settings(BaseSettings):
     actor_credentials_path: str = ".local/actor-accounts.json"
     secure_cookies: bool = False
     session_seconds: int = 14400
+    # When set, /api/chat runs the agent on this Amazon Bedrock AgentCore Runtime instead of in-process.
+    agent_runtime_arn: str = ""
 

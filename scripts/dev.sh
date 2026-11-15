@@ -2,18 +2,21 @@
 # Start the persistent LOCAL demo. Ctrl+C stops only processes this script owns.
 set -euo pipefail
 restart=true
-case "${1:-}" in
-  --restart) restart=true; shift ;;
-  -h|--help)
-    echo 'Usage: bash scripts/dev.sh [--restart]'
-    echo 'Stops listeners on ports 8000 and 5173 before starting (default).'
-    echo '  --restart  Explicit alias for the default behavior.'
-    exit 0 ;;
-esac
-if [ "$#" -ne 0 ]; then
-  echo 'Usage: bash scripts/dev.sh [--restart]' >&2
-  exit 2
-fi
+storage=local
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --restart) restart=true; shift ;;
+    --aws) storage=aws; shift ;;
+    -h|--help)
+      echo 'Usage: bash scripts/dev.sh [--restart] [--aws]'
+      echo 'Stops listeners on ports 8000 and 5173 before starting (default).'
+      echo '  --restart  Explicit alias for the default behavior.'
+      echo '  --aws      Use the AWS DynamoDB table (SKILLPILOT_TABLE_NAME, default workshop-skillpilot)'
+      echo '             instead of DynamoDB Local. Create it first: python -m scripts.setup_aws_table'
+      exit 0 ;;
+    *) echo 'Usage: bash scripts/dev.sh [--restart] [--aws]' >&2; exit 2 ;;
+  esac
+done
 cd "$(dirname "$0")/.."
 mkdir -p .local
 owned_pids=()
@@ -78,6 +81,22 @@ for port in ports:
         if s.connect_ex(('127.0.0.1',port)) == 0:
             raise SystemExit(f'Port {port} is still in use after stopping existing listeners.')
 PY
+
+if [ "$storage" = aws ]; then
+  # Real AWS DynamoDB via the standard credential chain (.env); no local database.
+  # Chat runs on the deployed AgentCore Runtime when its ARN is known
+  # (SKILLPILOT_AGENT_RUNTIME_ARN, or .local/agentcore-runtime-arn written after deployment).
+  runtime_arn="${SKILLPILOT_AGENT_RUNTIME_ARN:-$(cat .local/agentcore-runtime-arn 2>/dev/null || true)}"
+  SKILLPILOT_REPOSITORY=dynamodb SKILLPILOT_TABLE_NAME="${SKILLPILOT_TABLE_NAME:-workshop-skillpilot}" \
+  SKILLPILOT_AGENT_RUNTIME_ARN="$runtime_arn" \
+    .venv/bin/uvicorn backend.api:app --host 127.0.0.1 --port 8000 &
+  owned_pids+=("$!")
+  npm run dev --prefix frontend &
+  owned_pids+=("$!")
+  echo "SkillPilot (AWS DynamoDB: ${SKILLPILOT_TABLE_NAME:-workshop-skillpilot}; agent: ${runtime_arn:+AgentCore Runtime}${runtime_arn:-in-process}): http://127.0.0.1:5173 · Ctrl+C stops it."
+  wait
+  exit 0
+fi
 
 if ! .venv/bin/python - <<'PY'
 import socket

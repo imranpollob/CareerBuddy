@@ -9,9 +9,9 @@ def test_runtime_uses_authenticated_new_user(client,monkeypatch):
     response=client.post("/api/auth/signup",json={"email":"runtime@example.com","password":"Runtime account password 2026!","name":"Runtime User","current_role":"Engineer"})
     uid=response.json()["profile"]["id"]
     token=client.cookies.get("skillpilot_session")
-    monkeypatch.setattr(main,"api",client.app)
+    monkeypatch.setattr(main,"_state",(client.app.state.settings,client.app.state.service,client.app.state.auth))
     observed=[]
-    def fake_chat(service,settings,user_id,role,message):
+    def fake_chat(service,settings,user_id,role,message,history=None):
         observed.append((user_id,role))
         return ChatResponse(message="Hello",mode="mock",delegations=[]),[]
     monkeypatch.setattr(main,"chat",fake_chat)
@@ -19,11 +19,13 @@ def test_runtime_uses_authenticated_new_user(client,monkeypatch):
     assert result["message"]=="Hello"
     assert observed==[(uid,"candidate")]
     assert uid!="candidate-demo"
+    # The runtime persists the conversation for the signed-in user.
+    assert [m["text"] for m in client.get("/api/chat/history").json()["messages"]]==["Hello","Hello"]
 
 
 def test_runtime_rejects_invalid_session_and_identity_override(client,monkeypatch):
     from backend import main
-    monkeypatch.setattr(main,"api",client.app)
+    monkeypatch.setattr(main,"_state",(client.app.state.settings,client.app.state.service,client.app.state.auth))
     with pytest.raises(InvalidCredentials):
         main.invoke({"message":"Hello","session_token":"invalid-session-token-that-is-long-enough"})
     with pytest.raises(ValidationError):
