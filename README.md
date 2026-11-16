@@ -10,6 +10,12 @@ CareerBuddy helps people reach their career goals by
   
 Passed assessments become a verifiable **Skill Passport** that is matched against real job requirements, and employers discover consenting candidates by assessment-backed skills rather than resumes.
 
+![intro](intro.png)
+
+![stackholders](stackholders.png)
+
+Check our presentation slide: [CareerBuddy-Pitch-Deck.pptx](CareerBuddy-Pitch-Deck.pptx)
+
 Built with Amazon Bedrock (Nova 2 Lite), Amazon Bedrock AgentCore Runtime, Amazon DynamoDB, Strands Agents, FastAPI and React.
 
 |Work| Stat|
