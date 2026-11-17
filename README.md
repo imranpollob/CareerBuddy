@@ -10,6 +10,8 @@ CareerBuddy helps people reach their career goals by
   
 Passed assessments become a verifiable **Skill Passport** that is matched against real job requirements, and employers discover consenting candidates by assessment-backed skills rather than resumes.
 
+🏆 **3rd Place, Most Impactful AI Architecture on AWS track, Builder Wars Hackathon 2026**
+
 ![intro](intro.png)
 
 ![stackholders](stackholders.png)
